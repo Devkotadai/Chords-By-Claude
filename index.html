@@ -52,6 +52,11 @@
   .hc { padding:3px 10px; border-radius:7px; font-weight:700; font-size:14px; color:#fff; }
   .rec { display:inline-block; width:9px; height:9px; border-radius:50%; background:#ff5a5a; margin-right:8px; animation: pulse 1.2s infinite; }
   @keyframes pulse { 50% { opacity:.25; } }
+  .lyrics { max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:6px 12px; margin-top:8px; }
+  .ll { padding:8px 0; border-bottom:1px solid var(--line); } .ll:last-child { border-bottom:0; }
+  .ll .chips { display:flex; gap:5px; flex-wrap:wrap; min-height:22px; margin-bottom:3px; }
+  .ll .chips .hc { font-size:12px; padding:1px 8px; }
+  .ll .txt { font-size:17px; } .ll.interim .txt { color:var(--muted); font-style:italic; }
   .foot { color: var(--muted); font-size: 13px; margin-top: 18px; }
   .err { color:#ff8e8e; }
 </style>
@@ -63,7 +68,7 @@
 
   <label class="drop" id="drop">
     <b>Drop an audio file here, or tap to choose</b>
-    <span>MP3, M4A, WAV, OGG — everything runs in your browser, nothing is uploaded</span>
+    <span>MP3, M4A, WAV, OGG — analysis runs in your browser and nothing is uploaded (the optional lyrics mode is the exception, see below)</span>
     <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac">
   </label>
   <div class="row" style="margin-top:10px">
@@ -88,6 +93,13 @@
     <div class="lvl"><i id="lvl"></i></div>
     <h2 style="margin-top:16px">Heard so far</h2>
     <div class="heard" id="heard"></div>
+    <div class="row" style="justify-content:space-between;margin-top:18px">
+      <h2 style="margin:0">Lyrics with chords (experimental)</h2>
+      <label class="t" style="font-size:14px"><input type="checkbox" id="lyr"> Transcribe what's sung</label>
+    </div>
+    <div class="next" id="lyrnote" style="margin-top:6px">Off. When on, your browser turns the sound into text. In Chrome and Safari that audio is sent to the browser maker's speech service, so the page's "nothing is uploaded" promise does not hold in this mode. Accuracy on music is often poor.</div>
+    <div class="lyrics" id="lyrics" style="display:none"></div>
+    <div class="row" style="margin-top:10px"><button id="lyrcopy">Copy chords + lyrics</button><span class="status" id="lyrcopied" style="margin:0"></span></div>
   </div>
 
   <div id="app">
@@ -117,6 +129,11 @@
           <small>Higher = fewer, longer chords. Lower = reacts to quick changes.</small>
         </div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Your lyrics (optional)</h2>
+      <textarea id="paste" placeholder="Paste lyrics you have the right to use here, to read along while the chords play." style="height:110px"></textarea>
     </div>
 
     <div class="card">
@@ -523,6 +540,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
     mic = { stream, ctx, proc, src, mute, timer: null, busy: false, cand: '', count: 0, shown: '' };
     $('live').style.display = 'block'; $('rec').style.display = 'inline-block';
+    chordLog.length = 0; resetLyrics();
     $('heard').innerHTML = ''; $('lcur').textContent = '–'; $('lcur').style.color = ''; $('lnotes').textContent = '';
     $('lhint').textContent = 'Play some music near the microphone…';
     status('Listening through your microphone.');
@@ -537,6 +555,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
         if (r.label === mic.cand) mic.count++; else { mic.cand = r.label; mic.count = 1; }
         if (mic.count >= 2 && r.label !== mic.shown) {
           mic.shown = r.label;
+          chordLog.push({ t: performance.now(), label: r.root < 0 ? null : r.label, root: r.root, q: r.q });
           if (r.root < 0) { $('lcur').textContent = '–'; $('lcur').style.color = ''; $('lnotes').textContent = ''; }
           else {
             $('lcur').textContent = r.label; $('lcur').style.color = colour(r).replace(/,\d+%\)$/, ',62%)'); $('lnotes').textContent = r.notes.join(' · ');
@@ -551,12 +570,63 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   }
   function stopMic() {
     if (!mic) return;
+    stopLyrics(); $('lyr').checked = false;
     clearInterval(mic.timer);
     try { mic.proc.disconnect(); mic.src.disconnect(); mic.mute.disconnect(); } catch (e) {}
     mic.stream.getTracks().forEach(t => t.stop());
     try { mic.ctx.close(); } catch (e) {}
     mic = null; $('rec').style.display = 'none'; $('lvl').style.width = '0'; $('lhint').textContent = 'Stopped.'; status('');
   }
+  // ---------- lyrics (speech-to-text) next to chords ----------
+  const chordLog = [], lyricLines = [];
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, recWant = false, curLine = null;
+  function chordsFor(line) {
+    const out = []; let base = null;
+    for (const c of chordLog) { if (c.t <= line.t0) base = c; }
+    if (base && base.label) out.push(base);
+    for (const c of chordLog) if (c.t > line.t0 && c.label && (!out.length || out[out.length - 1].label !== c.label)) out.push(c);
+    return out;
+  }
+  function drawLine(line, interim) {
+    line.chipsEl.innerHTML = chordsFor(line).map(c => `<span class="hc" style="background:${colour(c)}">${c.label}</span>`).join('');
+    line.txtEl.textContent = line.text; line.el.classList.toggle('interim', interim);
+    const L = $('lyrics'); L.scrollTop = L.scrollHeight;
+  }
+  function newLine() {
+    const el = document.createElement('div'); el.className = 'll';
+    el.innerHTML = '<div class="chips"></div><div class="txt"></div>';
+    $('lyrics').appendChild(el); $('lyrics').style.display = 'block';
+    const line = { t0: performance.now(), text: '', el, chipsEl: el.firstChild, txtEl: el.lastChild };
+    lyricLines.push(line); return line;
+  }
+  function resetLyrics() { lyricLines.length = 0; curLine = null; $('lyrics').innerHTML = ''; $('lyrics').style.display = 'none'; }
+  function startLyrics() {
+    if (!SR) { $('lyrnote').textContent = 'This browser can\'t do speech-to-text. Chrome (computer or Android) or Safari on iPhone usually can.'; $('lyr').checked = false; return; }
+    rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || 'en-US';
+    rec.onresult = e => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i], txt = (r[0].transcript || '').trim(); if (!txt) continue;
+        if (!curLine) curLine = newLine();
+        curLine.text = txt; drawLine(curLine, !r.isFinal);
+        if (r.isFinal) curLine = null;
+      }
+    };
+    rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Speech-to-text was blocked. Allow it when the browser asks, or use the paste box instead.'; } };
+    rec.onend = () => { if (recWant) { try { rec.start(); } catch (e) {} } };
+    recWant = true;
+    try { rec.start(); $('lyrnote').textContent = 'Transcribing… sung words appear below with the chords heard at that moment. Expect mistakes on music.'; }
+    catch (e) { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Could not start speech-to-text.'; }
+  }
+  function stopLyrics() { recWant = false; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } }
+  $('lyr').addEventListener('change', () => { if (!mic) { $('lyr').checked = false; return; } $('lyr').checked ? startLyrics() : (stopLyrics(), $('lyrnote').textContent = 'Off.'); });
+  $('lyrcopy').addEventListener('click', async () => {
+    const txt = lyricLines.filter(l => l.text).map(l => chordsFor(l).map(c => c.label).join(' ') + '\n' + l.text).join('\n\n');
+    if (!txt) { $('lyrcopied').textContent = 'Nothing to copy yet.'; return; }
+    try { await navigator.clipboard.writeText(txt); $('lyrcopied').textContent = 'Copied.'; }
+    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.style.cssText = 'width:100%;height:120px;margin-top:8px'; $('lyrcopied').after(ta); ta.select(); $('lyrcopied').textContent = 'Select the text below and copy it.'; }
+  });
+
   $('mic').addEventListener('click', startMic);
   $('stop').addEventListener('click', stopMic);
   loop();
