@@ -87,8 +87,6 @@
   input[type=range] { width:100%; accent-color:#fff; }
   .ctrl small, .small { color:var(--mute); display:block; font-size:13px; }
   select { font:500 15px var(--body); color:var(--ink); background:var(--raise); border:1px solid #33406A; border-radius:10px; padding:9px 12px; max-width:100%; }
-  .chk { display:inline-flex; gap:8px; align-items:center; color:var(--mute); font-size:14px; cursor:pointer; }
-  input[type=url], input[type=password] { background:#0E1424; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:10px 12px; font:14px var(--body); }
 
   /* ---- chord list ---- */
   #list { max-height:320px; overflow:auto; position:relative; border-radius:12px; background:var(--raise); }
@@ -147,35 +145,14 @@
           <label class="t"><input type="checkbox" id="use7"> Include 7th chords (Cmaj7, Am7, G7)</label>
           <small>Off keeps it to plain major and minor chords, which is the most reliable.</small>
         </div>
-        <details>
-          <summary>Fine-tune</summary>
-          <label for="pen" style="display:block;margin-top:8px">Stability: <span id="penv"></span></label>
-          <input type="range" id="pen" min="0.3" max="2.5" step="0.1" value="0.9">
-          <small>Higher gives fewer, longer chords. Lower follows quick changes.</small>
-        </details>
       </div>
     </section>
 
     <section class="block">
       <h2>Chords by time</h2>
       <div id="list"></div>
-      <div class="row" style="margin-top:12px"><button class="btn small" id="copy">Copy chords</button><span class="status" id="copied" style="margin:0"></span></div>
     </section>
   </div>
-
-  <section class="block" id="notion">
-    <div class="row">
-      <button class="btn small" id="nsave" disabled>Save to Notion</button>
-      <label class="chk"><input type="checkbox" id="nauto"> Save every song automatically</label>
-    </div>
-    <div class="status" id="nstat" style="margin-top:10px"></div>
-    <details id="nset"><summary>Notion connection</summary>
-      <div class="hint" style="margin:8px 0">Paste the save address and passcode from your setup. They stay in this browser.</div>
-      <input id="nurl" type="url" placeholder="https://your-app.vercel.app/api/save" autocomplete="off" style="width:100%;margin-top:6px">
-      <input id="nkey" type="password" placeholder="Passcode" autocomplete="off" style="width:100%;margin-top:8px">
-      <div class="row" style="margin-top:8px"><button class="btn small" id="nsetsave">Save connection</button></div>
-    </details>
-  </section>
 
   <p class="foot">Chords are found with signal processing, not a trained model. It works best on clear pop, rock and acoustic music, and is less reliable on heavy distortion, dense mixes or fast jazz. Treat it as a starting point and check by ear.</p>
 </main>
@@ -428,8 +405,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   const $ = id => document.getElementById(id);
   const core = window.ChordCore, audio = $('audio'), NOTES = core.NOTES;
   let an = null, segs = [], dur = 0, objUrl = null, lastIdx = -2;
-  let sheet = '', mic = null, usedSet = new Set(), keyPos = '';
-  let song = { title: '', source: 'Uploaded file', when: null }, lastKeyName = '', savedFor = null, saving = false;
+  let mic = null, usedSet = new Set(), keyPos = '';
 
   // ---------- helpers ----------
   const pretty = s => s.replace('#', '♯');
@@ -489,7 +465,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   }
   function setUsed(list) { usedSet = new Set(list.filter(c => c.root >= 0).map(keyOf)); }
   function setKey(name) {
-    keyPos = ''; lastKeyName = name || '';
+    keyPos = '';
     const m = /^([A-G]#?) (major|minor)$/.exec(name || '');
     if (m) { const r = NOTES.indexOf(m[1]), mn = m[2] === 'minor'; keyPos = (mn ? 'min' : 'maj') + posOf(r, mn); }
     $('keywrap').style.display = m ? 'block' : 'none'; $('key').textContent = m ? pretty(name) : '';
@@ -526,9 +502,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       dur = an.duration; progress(null);
       status('Done. Press play to follow along.');
       $('session').style.display = 'block';
-      savedFor = null;
       render();
-      if ($('nauto').checked && cfg().url && cfg().key) saveNotion(true);
     } catch (e) { progress(null); status(e.message || 'Could not analyse that audio.', true); }
   }
   async function loadFile(file) {
@@ -537,14 +511,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     status('Reading ' + file.name + '…'); progress(0.02);
     try {
       const buf = await file.arrayBuffer();
-      song = { title: file.name.replace(/\.[^.\/\\]+$/, '').trim() || 'Untitled song', source: 'Uploaded file', when: new Date() };
       const ab = await decodeAudio(buf);
       await analyse(toMono(ab), ab.sampleRate, URL.createObjectURL(file));
     } catch (e) { progress(null); status('Could not read that file. Try an MP3, M4A or WAV.', true); }
   }
 
   function render() {
-    const pen = parseFloat($('pen').value); $('penv').textContent = pen.toFixed(1);
+    const pen = 0.9;
     const r = core.decodeChords(an, { use7: $('use7').checked, penalty: pen });
     segs = r.segments; setKey(r.key); setUsed(segs);
     const tl = $('tl'); tl.querySelectorAll('.seg').forEach(e => e.remove());
@@ -565,10 +538,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       d.onclick = () => { audio.currentTime = s.t0 + 0.01; };
       $('list').appendChild(d);
     });
-    const real = segs.filter(s => s.root >= 0);
-    sheet = 'Key (estimated): ' + (r.key || '?') + '\n\n' + segs.map(s => fmt(s.t0).padEnd(6) + (s.root < 0 ? '(rest)' : s.label)).join('\n') +
-      '\n\nProgression:\n' + real.map(s => s.label).join(' | ');
-    $('nsave').disabled = false;
     lastIdx = -2; tick();
   }
 
@@ -600,16 +569,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   ['dragleave', 'drop'].forEach(n => document.addEventListener(n, e => { e.preventDefault(); $('sources').classList.remove('over'); }));
   document.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
   $('use7').addEventListener('change', () => an && render());
-  $('pen').addEventListener('input', () => an && render());
   $('demo').addEventListener('click', async () => {
     if (mic) await stopMic(true);
     const prog = ['C', 'G', 'Am', 'F', 'C', 'G', 'F', 'C'], sr = 22050;
     const x = core.synthProgression(prog, sr, 2, { noise: 0.02, melody: true });
     analyse(x, sr, URL.createObjectURL(wavBlob(x, sr)));
-  });
-  $('copy').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(sheet); $('copied').textContent = 'Copied.'; }
-    catch (e) { $('copied').textContent = 'Could not copy on this browser.'; }
   });
 
   // ---------- live microphone: listen, record, then play back ----------
@@ -621,13 +585,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
     catch (e) { status(e && e.name === 'NotFoundError' ? 'No microphone found on this device.' : MIC_BLOCKED, true); return; }
-    audio.pause(); segs = []; an = null; sheet = ''; $('nsave').disabled = true; setUsed([]); setKey(''); $('session').style.display = 'none';
+    audio.pause(); segs = []; an = null; setUsed([]); setKey(''); $('session').style.display = 'none';
     const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
     try { await ctx.resume(); } catch (e) {}
     const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain();
     mute.gain.value = 0;
     const ring = new Float32Array(Math.round(ctx.sampleRate * 2)); let wp = 0, filled = 0;
-    mic = { stream, ctx, proc, src, mute, timer: null, busy: false, cand: '', count: 0, shown: '', chunks: [], len: 0, t0: performance.now(), startedAt: new Date(), heardList: [] };
+    mic = { stream, ctx, proc, src, mute, timer: null, busy: false, cand: '', count: 0, shown: '', chunks: [], len: 0, t0: performance.now(), heardList: [] };
     proc.onaudioprocess = e => {
       const d = e.inputBuffer.getChannelData(0);
       for (let i = 0; i < d.length; i++) { ring[wp] = d[i]; wp = (wp + 1) % ring.length; }
@@ -675,7 +639,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     if (m.len < sr * 3) { status('That was too short to save. Record at least 3 seconds.', true); showChord(null); $('next').textContent = ''; return; }
     const x = new Float32Array(m.len); let o = 0; for (const c of m.chunks) { x.set(c, o); o += c.length; }
     const blob = wavBlob(x, sr);
-    song = { title: 'Recording, ' + whenLabel(m.startedAt), source: 'Recording', when: m.startedAt };
     if (silent) { status(''); }
     await analyse(x, sr, URL.createObjectURL(blob));
     status('Saved your recording. Press play to hear it back with the chords.');
@@ -683,45 +646,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   }
   $('mic').addEventListener('click', startMic);
   $('stop').addEventListener('click', () => stopMic());
-
-  // ---------- save to Notion ----------
-  function whenLabel(d) { return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
-  function cfg() { try { return { url: localStorage.getItem('cbc_url') || '', key: localStorage.getItem('cbc_key') || '', auto: localStorage.getItem('cbc_auto') === '1' }; } catch (e) { return { url: '', key: '', auto: false }; } }
-  function nstat(msg, err) { $('nstat').textContent = msg || ''; $('nstat').className = 'status' + (err ? ' err' : ''); }
-  function notionPayload() {
-    const d = song.when || new Date();
-    return {
-      title: song.title || 'Untitled song', source: song.source,
-      whenText: d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
-      key: lastKeyName || null, durationSec: Math.round(dur), use7: $('use7').checked,
-      chords: segs.filter(c => c.root >= 0).map(c => ({ t: Math.round(c.t0 * 10) / 10, label: c.label })),
-    };
-  }
-  async function saveNotion(auto) {
-    if (saving || !segs.length) return;
-    const c = cfg();
-    if (!c.url || !c.key) { $('nset').open = true; nstat('Add your save address and passcode first.', true); return; }
-    const sig = JSON.stringify([song.title, segs.length, $('use7').checked]);
-    if (savedFor === sig && auto !== true) { nstat('Already saved. Change something, or this song would be added twice.', true); return; }
-    saving = true; $('nsave').disabled = true; nstat('Saving "' + song.title + '"…');
-    try {
-      const r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-save-key': c.key }, body: JSON.stringify(notionPayload()) });
-      let j = {}; try { j = await r.json(); } catch (e) {}
-      if (!r.ok || !j.ok) throw new Error(j.error || 'The save failed (' + r.status + ').');
-      savedFor = sig; nstat('Saved "' + song.title + '" to your Notion page.');
-    } catch (e) {
-      nstat(e instanceof TypeError ? 'Could not reach the save address. Check it and your connection.' : e.message, true);
-    } finally { saving = false; $('nsave').disabled = false; }
-  }
-  $('nsave').addEventListener('click', () => saveNotion(false));
-  $('nsetsave').addEventListener('click', () => {
-    const url = $('nurl').value.trim(), key = $('nkey').value;
-    if (!/^https:\/\//.test(url)) { nstat('The save address must start with https://', true); return; }
-    try { localStorage.setItem('cbc_url', url); localStorage.setItem('cbc_key', key); nstat('Settings saved in this browser.'); $('nset').open = false; }
-    catch (e) { nstat('This browser would not store the settings.', true); }
-  });
-  $('nauto').addEventListener('change', () => { try { localStorage.setItem('cbc_auto', $('nauto').checked ? '1' : '0'); } catch (e) {} });
-  (function () { const c = cfg(); $('nurl').value = c.url; $('nkey').value = c.key; $('nauto').checked = c.auto; })();
 
   ringPaint(null);
   requestAnimationFrame(tick);
