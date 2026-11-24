@@ -57,6 +57,16 @@
   .ll .chips { display:flex; gap:5px; flex-wrap:wrap; min-height:22px; margin-bottom:3px; }
   .ll .chips .hc { font-size:12px; padding:1px 8px; }
   .ll .txt { font-size:17px; } .ll.interim .txt { color:var(--muted); font-style:italic; }
+  .sync { max-height:420px; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:12px; display:none; }
+  .sl { display:flex; gap:12px; padding:10px 12px; border-bottom:1px solid var(--line); border-left:3px solid transparent; cursor:pointer; }
+  .sl:last-child { border-bottom:0; } .sl:hover { background:#1c2230; }
+  .sl.on { background:#1d2638; border-left-color:var(--accent); }
+  .sl .tm { color:var(--muted); width:40px; flex:none; font-variant-numeric:tabular-nums; padding-top:20px; font-size:13px; }
+  .words { display:flex; flex-wrap:wrap; gap:2px 9px; align-items:flex-start; }
+  .w { display:flex; flex-direction:column; align-items:flex-start; }
+  .w .c { font-weight:800; font-size:14px; line-height:20px; height:20px; white-space:nowrap; }
+  .w .x { font-size:17px; line-height:24px; padding:0 2px; } .sl.on .w.hl .x { background:#2f4b78; border-radius:4px; }
+  select { font:inherit; color:var(--ink); background:#212837; border:1px solid var(--line); border-radius:9px; padding:8px 10px; }
   .foot { color: var(--muted); font-size: 13px; margin-top: 18px; }
   .err { color:#ff8e8e; }
 </style>
@@ -129,6 +139,21 @@
           <small>Higher = fewer, longer chords. Lower = reacts to quick changes.</small>
         </div>
       </div>
+    </div>
+
+    <div class="card" id="tcard">
+      <h2>Lyrics synced to chords (experimental)</h2>
+      <div class="row">
+        <select id="tmodel" aria-label="Speech model">
+          <option value="Xenova/whisper-tiny.en">Tiny: English only, small download, fastest</option>
+          <option value="Xenova/whisper-base">Base: many languages, larger download, a bit better</option>
+        </select>
+        <button id="trans">Transcribe this file</button>
+      </div>
+      <div class="next" id="tstat" style="margin-top:8px">Your audio stays on your device. A speech model is downloaded once from the internet and then cached by your browser. A full song can take a few minutes. Works best when the voice is clear; singing over loud instruments is often garbled.</div>
+      <div class="bar" id="tbar"><i id="tfill"></i></div>
+      <div class="sync" id="sync"></div>
+      <div class="row" style="margin-top:10px"><button id="tcopy" style="display:none">Copy chord sheet with lyrics</button><span class="status" id="tcopied" style="margin:0"></span></div>
     </div>
 
     <div class="card">
@@ -398,6 +423,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   const core = window.ChordCore;
   const audio = $('audio');
   let an = null, segs = [], dur = 0, objUrl = null, lastIdx = -2;
+  let fileBuf = null, tLines = [], tWorker = null, lastLine = -1, lastWord = -1;
 
   const fmt = t => { t = Math.round(t); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
   const colour = s => s.root < 0 ? '#3a4152' : `hsl(${s.root * 30},${s.q.startsWith('m') && s.q !== 'maj7' ? 38 : 58}%,${s.q.startsWith('m') && s.q !== 'maj7' ? 36 : 44}%)`;
@@ -426,6 +452,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
 
   async function analyse(samples, sr, url) {
     try {
+      tLines = [];
       if (objUrl) URL.revokeObjectURL(objUrl);
       objUrl = url; audio.src = url;
       const d = core.downsample(samples, sr, 22050);
@@ -443,6 +470,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     status('Reading ' + file.name + '…'); progress(0.02);
     try {
       const buf = await file.arrayBuffer();
+      fileBuf = buf.slice(0);
       const ab = await decodeAudio(buf);
       await analyse(toMono(ab), ab.sampleRate, URL.createObjectURL(file));
     } catch (e) { progress(null); status('Could not read that file. Try an MP3, M4A or WAV.', true); }
@@ -471,7 +499,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     const real = segs.filter(s => s.root >= 0);
     $('sheet').value = 'Key (estimated): ' + (r.key || '?') + '\n\n' + segs.map(s => fmt(s.t0).padEnd(6) + (s.root < 0 ? '(rest)' : s.label)).join('\n') +
       '\n\nProgression:\n' + real.map(s => s.label).join(' | ');
-    lastIdx = -2; tick();
+    lastIdx = -2; renderSync(); tick();
   }
 
   function findIdx(t) { let lo = 0, hi = segs.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (segs[m].t0 <= t) lo = m; else hi = m - 1; } return lo; }
@@ -479,6 +507,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     if (segs.length) {
       const t = audio.currentTime || 0, i = findIdx(t), s = segs[i];
       $('ph').style.left = (t / dur * 100) + '%';
+      syncTick(t);
       if (i !== lastIdx) {
         lastIdx = i;
         $('cur').textContent = s.root < 0 ? '–' : s.label;
@@ -509,12 +538,178 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   $('demo').addEventListener('click', () => {
     const prog = ['C', 'G', 'Am', 'F', 'C', 'G', 'F', 'C'], sr = 22050;
     const x = core.synthProgression(prog, sr, 2, { noise: 0.02, melody: true });
+    fileBuf = null;
     analyse(x, sr, URL.createObjectURL(wavBlob(x, sr)));
   });
   $('copy').addEventListener('click', async () => {
     const ta = $('sheet');
     try { await navigator.clipboard.writeText(ta.value); $('copied').textContent = 'Copied.'; }
     catch (e) { ta.select(); $('copied').textContent = 'Text selected — press Ctrl/Cmd+C.'; }
+  });
+
+  // ---------- transcribe an uploaded file (Whisper in a background worker) + chord sync ----------
+  const WORKER_SRC = `
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js';
+    env.allowLocalModels = false;
+    let asr = null, loaded = '';
+    const files = {};
+    self.onmessage = async (e) => {
+      const { model, audio } = e.data;
+      try {
+        if (!asr || loaded !== model) {
+          asr = await pipeline('automatic-speech-recognition', model, { progress_callback: (p) => {
+            if (p && p.status === 'progress' && p.file) {
+              files[p.file] = { l: p.loaded || 0, t: p.total || 0 };
+              let l = 0, t = 0; for (const k in files) { l += files[k].l; t += files[k].t; }
+              self.postMessage({ type: 'download', pct: t ? Math.min(100, l / t * 100) : 0 });
+            }
+          } });
+          loaded = model;
+        }
+        self.postMessage({ type: 'transcribing' });
+        const out = await asr(audio, { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5 });
+        self.postMessage({ type: 'done', chunks: out.chunks || [], text: out.text || '' });
+      } catch (err) { self.postMessage({ type: 'error', msg: String((err && err.message) || err) }); }
+    };`;
+  const tstat = (m, err) => { $('tstat').textContent = m; $('tstat').className = 'next' + (err ? ' err' : ''); };
+  const tbar = p => { $('tbar').style.display = p == null ? 'none' : 'block'; $('tfill').style.width = ((p || 0)) + '%'; };
+
+  async function audio16k(buf) {
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ab = await new Promise((res, rej) => { const p = new Ctx(1, 1, 16000).decodeAudioData(buf.slice(0), res, rej); if (p && p.then) p.then(res, rej); });
+    let x = toMono(ab);
+    if (Math.abs(ab.sampleRate - 16000) > 1) {            // browser kept its own rate: resample
+      const r = ab.sampleRate / 16000, y = new Float32Array(Math.floor(x.length / r));
+      for (let i = 0; i < y.length; i++) { const f = i * r, j = Math.floor(f), a = x[j], b = x[j + 1] === undefined ? a : x[j + 1]; y[i] = a + (b - a) * (f - j); }
+      x = y;
+    }
+    return x;
+  }
+
+  function cleanChunks(chunks) {
+    const out = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const text = (chunks[i].text || '').replace(/\s+/g, ' ').trim();
+      if (!text) continue;
+      if (/^[\[(*♪\s].*[\])*♪\s]$/.test(text) && text.length < 40) continue;      // "(music)", "[Applause]", "♪"
+      const ts = chunks[i].timestamp || [0, null];
+      let t0 = ts[0] == null ? 0 : ts[0], t1 = ts[1];
+      if (t1 == null) { const nx = chunks.slice(i + 1).find(c => c.timestamp && c.timestamp[0] != null); t1 = nx ? nx.timestamp[0] : dur; }
+      if (t1 <= t0) t1 = t0 + 2;
+      if (out.length && out[out.length - 1].text.toLowerCase() === text.toLowerCase()) continue;   // repeated hallucination
+      out.push({ t0, t1, text });
+    }
+    return out;
+  }
+
+  // Which chord changes land on which word of a line (word timing is estimated from where it sits in the phrase)
+  function placeChords(l) {
+    const words = l.text.split(' '), total = l.text.length || 1, wt = [];
+    let pos = 0;
+    for (const w of words) { wt.push(l.t0 + (pos / total) * (l.t1 - l.t0)); pos += w.length + 1; }
+    const at = words.map(() => []);
+    let last = '';
+    for (const s of segs) {
+      if (s.root < 0 || s.t1 <= l.t0 || s.t0 >= l.t1) continue;
+      if (s.t0 > l.t0 && s.t0 > l.t1 - 0.4) continue;      // starts as the line ends: belongs to the next line
+      const when = Math.max(s.t0, l.t0);
+      let wi = 0; for (let i = 0; i < wt.length; i++) if (wt[i] <= when + 0.15) wi = i;
+      if (s.label === last) continue; last = s.label;
+      at[wi].push(s);
+    }
+    return { words, wt, at };
+  }
+
+  function renderSync() {
+    const box = $('sync'); box.innerHTML = '';
+    lastLine = -1; lastWord = -1;
+    if (!tLines.length) { box.style.display = 'none'; $('tcopy').style.display = 'none'; return; }
+    box.style.display = 'block'; $('tcopy').style.display = 'inline-block';
+    tLines.forEach((l, i) => {
+      const { words, wt, at } = placeChords(l);
+      l.wt = wt; l.wordEls = [];
+      const row = document.createElement('div'); row.className = 'sl';
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmt(l.t0);
+      const wd = document.createElement('div'); wd.className = 'words';
+      words.forEach((w, k) => {
+        const cell = document.createElement('span'); cell.className = 'w';
+        const c = document.createElement('span'); c.className = 'c';
+        c.innerHTML = at[k].map(s => `<span style="color:${colour(s).replace(/,\d+%\)$/, ',66%)')}">${s.label}</span>`).join(' ');
+        const x = document.createElement('span'); x.className = 'x'; x.textContent = w;
+        cell.append(c, x); wd.appendChild(cell); l.wordEls.push(cell);
+      });
+      l.sheet = { words, at };
+      row.append(tm, wd); row.onclick = () => { audio.currentTime = l.t0 + 0.01; };
+      l.row = row; box.appendChild(row);
+    });
+  }
+
+  function syncTick(t) {
+    if (!tLines.length) return;
+    let li = -1; for (let i = 0; i < tLines.length; i++) { if (tLines[i].t0 <= t + 0.05) li = i; else break; }
+    if (li >= 0 && t > tLines[li].t1 + 1.5) li = -1;                         // instrumental gap: nothing highlighted
+    if (li !== lastLine) {
+      if (lastLine >= 0 && tLines[lastLine]) tLines[lastLine].row.classList.remove('on');
+      lastLine = li; lastWord = -1;
+      if (li >= 0) {
+        const r = tLines[li].row; r.classList.add('on');
+        const B = $('sync'); if (r.offsetTop < B.scrollTop || r.offsetTop + r.offsetHeight > B.scrollTop + B.clientHeight) B.scrollTop = Math.max(0, r.offsetTop - 60);
+      }
+    }
+    if (li >= 0) {
+      const l = tLines[li]; let wi = 0; for (let i = 0; i < l.wt.length; i++) if (l.wt[i] <= t) wi = i;
+      if (wi !== lastWord) { if (lastWord >= 0 && l.wordEls[lastWord]) l.wordEls[lastWord].classList.remove('hl'); l.wordEls[wi].classList.add('hl'); lastWord = wi; }
+    }
+  }
+
+  function sheetText() {
+    return tLines.map(l => {
+      let c = '', w = '';
+      l.sheet.words.forEach((word, i) => {
+        const chord = l.sheet.at[i].map(s => s.label).join(' '), width = Math.max(word.length, chord.length) + 1;
+        c += chord.padEnd(width); w += word.padEnd(width);
+      });
+      return fmt(l.t0) + '\n' + c.trimEnd() + '\n' + w.trimEnd();
+    }).join('\n\n');
+  }
+
+  function finishTranscribe(msg, err) {
+    if (tWorker) { tWorker.terminate(); tWorker = null; }
+    $('trans').disabled = false; tbar(null); tstat(msg, err);
+  }
+
+  $('trans').addEventListener('click', async () => {
+    if (tWorker) return;
+    if (!fileBuf) { tstat('Transcription needs an uploaded audio file. The demo has no singing in it.', true); return; }
+    $('trans').disabled = true; tstat('Preparing the audio…'); tbar(0);
+    let audioData;
+    try { audioData = await audio16k(fileBuf); } catch (e) { finishTranscribe('Could not read that audio for transcription.', true); return; }
+    const FAIL = 'Could not load the speech model. This needs an internet connection and a normal web page, so it works on your GitHub site but not inside the Claude preview.';
+    try { tWorker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' })), { type: 'module' }); }
+    catch (e) { finishTranscribe(FAIL, true); return; }
+    let started = 0, timer = null;
+    tWorker.onerror = () => { clearInterval(timer); finishTranscribe(FAIL, true); };
+    tWorker.onmessage = ev => {
+      const m = ev.data;
+      if (m.type === 'download') { tbar(m.pct); tstat('Downloading the speech model… ' + Math.round(m.pct) + '% (only the first time)'); }
+      else if (m.type === 'transcribing') {
+        tbar(null); started = Date.now();
+        timer = setInterval(() => tstat('Transcribing… ' + Math.round((Date.now() - started) / 1000) + 's. Keep this tab open.'), 1000);
+        tstat('Transcribing… keep this tab open.');
+      }
+      else if (m.type === 'done') {
+        clearInterval(timer);
+        tLines = cleanChunks(m.chunks); renderSync();
+        finishTranscribe(tLines.length ? 'Done: ' + tLines.length + ' lines. Click a line to jump there. Chord names sit above the words where the chord changes.' : 'No words were recognised. Songs with loud instruments often defeat speech recognition; a clearer vocal track works much better.');
+      }
+      else if (m.type === 'error') { clearInterval(timer); finishTranscribe('Transcription failed: ' + m.msg, true); }
+    };
+    tWorker.postMessage({ model: $('tmodel').value, audio: audioData }, [audioData.buffer]);
+  });
+  $('tcopy').addEventListener('click', async () => {
+    const txt = sheetText();
+    try { await navigator.clipboard.writeText(txt); $('tcopied').textContent = 'Copied.'; }
+    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.style.cssText = 'width:100%;height:160px;margin-top:8px;font:13px ui-monospace,monospace'; $('tcopied').after(ta); ta.select(); $('tcopied').textContent = 'Select the text below and copy it.'; }
   });
 
   // ---------- live microphone mode ----------
