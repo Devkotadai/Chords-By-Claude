@@ -6,13 +6,13 @@
 <title>Chords by Claude</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg:#0A0E1A; --raise:#121829; --raise2:#1B2440; --line:#222B44;
     --ink:#F3F5FA; --mute:#98A2BD; --faint:#6B7694; --h:250;
     --display:'Unbounded', system-ui, sans-serif;
-    --body:'Figtree','Noto Sans Devanagari', system-ui, sans-serif;
+    --body:'Figtree', system-ui, sans-serif;
   }
   html { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -24,17 +24,15 @@
 
   /* ---- stage: ring + current chord ---- */
   .stage { position:relative; isolation:isolate; display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:28px 44px; align-items:center; padding:26px 0 18px; }
-  .stage::before { content:''; position:absolute; inset:-30px -20px; z-index:-1; opacity:0; transition:opacity .5s; pointer-events:none;
-    background: radial-gradient(55% 90% at 22% 50%, oklch(0.8 0.15 var(--h) / .22), transparent 70%); }
-  .stage.lit::before { opacity:1; }
-  @media (max-width:720px){ .stage { grid-template-columns:1fr; justify-items:center; text-align:center; gap:14px; padding-top:12px; } .notes, .nextline { justify-content:center; } }
+  #ring { transition: filter .5s; }
+  .stage.lit #ring { filter: drop-shadow(0 0 36px oklch(0.8 0.15 var(--h) / .28)); }
+  @media (max-width:720px){ .stage { grid-template-columns:1fr; justify-items:center; text-align:center; gap:14px; padding-top:12px; } .nextline { justify-content:center; } }
   #ring { width:100%; max-width:300px; height:auto; }
   @media (max-width:720px){ #ring { max-width:220px; } }
   #ring text { font:600 12px var(--body); pointer-events:none; }
   .big { font:700 clamp(56px, 12vw, 108px)/1 var(--display); letter-spacing:-.04em; color:var(--faint); margin:0; min-height:1em; }
   .big.on { color: oklch(0.84 0.14 var(--h)); }
   .big.idle { font-size:clamp(34px, 7vw, 56px); font-weight:500; letter-spacing:-.02em; }
-  .notes { display:flex; gap:12px; font-weight:600; font-size:18px; color:var(--mute); min-height:1.7em; margin-top:10px; }
   .nextline { color:var(--mute); margin-top:4px; min-height:1.6em; display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; }
   .nextline b { color:var(--ink); font-weight:600; }
   .keychip { display:inline-block; margin-top:10px; font-size:14px; color:var(--mute); }
@@ -70,7 +68,7 @@
   #live, #session { display:none; }
   .rec { display:inline-block; width:9px; height:9px; border-radius:50%; background:#FF5A6E; margin-right:10px; animation:pulse 1.3s infinite; }
   @keyframes pulse { 50% { opacity:.25; } }
-  @media (prefers-reduced-motion: reduce){ .rec { animation:none; } .stage::before { transition:none; } }
+  @media (prefers-reduced-motion: reduce){ .rec { animation:none; } #ring { transition:none; } }
   .lvl { height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin:14px 0 18px; }
   .lvl i { display:block; height:100%; width:0; background:#6EE7B7; transition:width .15s; }
   .heard { display:flex; flex-wrap:wrap; gap:8px; max-height:190px; overflow:auto; padding:2px; }
@@ -83,8 +81,7 @@
   .seg.rest { background:transparent; }
   .play { position:absolute; top:0; bottom:0; width:2px; background:#fff; box-shadow:0 0 8px #fff; pointer-events:none; }
 
-  .ctrl { display:grid; grid-template-columns:1fr 1fr; gap:14px 36px; }
-  @media (max-width:640px){ .ctrl { grid-template-columns:1fr; } }
+  .ctrl { display:grid; gap:14px; max-width:520px; }
   label.t { display:flex; gap:10px; align-items:center; cursor:pointer; }
   input[type=checkbox] { accent-color:#fff; width:18px; height:18px; }
   input[type=range] { width:100%; accent-color:#fff; }
@@ -92,35 +89,13 @@
   select { font:500 15px var(--body); color:var(--ink); background:var(--raise); border:1px solid #33406A; border-radius:10px; padding:9px 12px; max-width:100%; }
   .chk { display:inline-flex; gap:8px; align-items:center; color:var(--mute); font-size:14px; cursor:pointer; }
   input[type=url], input[type=password] { background:#0E1424; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:10px 12px; font:14px var(--body); }
-  textarea { width:100%; height:150px; background:#0E1424; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px; font:14px/1.5 var(--body); }
-  textarea.sheet { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; }
 
   /* ---- chord list ---- */
   #list { max-height:320px; overflow:auto; position:relative; border-radius:12px; background:var(--raise); }
-  .li { display:grid; grid-template-columns:52px 84px 1fr; gap:10px; padding:9px 14px; cursor:pointer; align-items:center; border-bottom:1px solid var(--line); }
+  .li { display:grid; grid-template-columns:52px 1fr; gap:10px; padding:9px 14px; cursor:pointer; align-items:center; border-bottom:1px solid var(--line); }
   .li:last-child { border-bottom:0; } .li:hover { background:var(--raise2); }
   .li.on { background:#1F2B4D; }
   .li .tm { color:var(--mute); font-variant-numeric:tabular-nums; }
-  .li .nt { color:var(--mute); font-size:14px; display:flex; gap:10px; }
-
-  /* ---- lyrics: live + synced ---- */
-  .lyrics { max-height:260px; overflow:auto; border-radius:12px; background:var(--raise); padding:6px 14px; margin-top:12px; display:none; }
-  .ll { padding:10px 0; border-bottom:1px solid var(--line); } .ll:last-child { border-bottom:0; }
-  .ll .chips { display:flex; gap:5px; flex-wrap:wrap; min-height:24px; margin-bottom:4px; }
-  .ll .chips .cc { font-size:12px; padding:2px 9px; }
-  .ll .txt { font-size:18px; } .ll.interim .txt { color:var(--mute); font-style:italic; }
-
-  .sync { max-height:440px; overflow:auto; border-radius:12px; background:var(--raise); margin-top:14px; display:none; }
-  .sl { display:flex; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line); border-left:3px solid transparent; cursor:pointer; }
-  .sl:last-child { border-bottom:0; } .sl:hover { background:var(--raise2); }
-  .sl.on { background:#1F2B4D; border-left-color:#fff; }
-  .sl .tm { color:var(--mute); width:40px; flex:none; font-variant-numeric:tabular-nums; padding-top:22px; font-size:13px; }
-  .words { display:flex; flex-wrap:wrap; gap:2px 10px; align-items:flex-start; }
-  .w { display:flex; flex-direction:column; align-items:flex-start; }
-  .w .c { font:700 13px/22px var(--display); letter-spacing:-.02em; height:22px; white-space:nowrap; }
-  .w .c span { color:oklch(0.84 0.14 var(--h)); margin-right:6px; }
-  .w .x { font-size:18px; line-height:26px; padding:0 2px; }
-  .sl.on .w.hl .x { background:#34508A; border-radius:5px; }
 
   details > summary { cursor:pointer; color:var(--mute); padding:4px 0; }
   .foot { color:var(--faint); font-size:13px; margin-top:30px; max-width:70ch; }
@@ -134,7 +109,6 @@
     <svg id="ring" viewBox="0 0 300 300" role="img" aria-label="Circle of fifths. The lit segment is the chord playing now."></svg>
     <div>
       <p class="big idle" id="cur" aria-live="polite">Ready</p>
-      <div class="notes" id="notes"></div>
       <div class="nextline" id="next">Upload a song, listen with the microphone, or try the demo.</div>
       <div class="keychip" id="keywrap" style="display:none">Key: <b id="key"></b></div>
     </div>
@@ -160,17 +134,7 @@
     <div class="heard" id="heard"></div>
     <div class="row" style="margin-top:22px">
       <label class="t"><input type="checkbox" id="l7"> Include 7th chords</label>
-      <label class="t"><input type="checkbox" id="lyr"> Transcribe the singing</label>
-      <select id="lang" aria-label="Language to listen for">
-        <option value="en-US">English</option>
-        <option value="ne-NP">नेपाली (Nepali)</option>
-        <option value="hi-IN">हिन्दी (Hindi)</option>
-        <option value="">This device's language</option>
-      </select>
     </div>
-    <div class="hint" id="lyrnote">Off. When on, your browser turns what it hears into text and sends the audio to its speech service (Google for Chrome, Apple for Safari). Accuracy on music is often poor.</div>
-    <div class="lyrics" id="lyrics"></div>
-    <div class="row" style="margin-top:12px"><button class="btn small" id="lyrcopy">Copy chords and lyrics</button><span class="status" id="lyrcopied" style="margin:0"></span></div>
   </section>
 
   <!-- a loaded song or finished recording -->
@@ -183,65 +147,37 @@
           <label class="t"><input type="checkbox" id="use7"> Include 7th chords (Cmaj7, Am7, G7)</label>
           <small>Off keeps it to plain major and minor chords, which is the most reliable.</small>
         </div>
-        <div>
-          <label for="pen">Stability: <span id="penv"></span></label>
+        <details>
+          <summary>Fine-tune</summary>
+          <label for="pen" style="display:block;margin-top:8px">Stability: <span id="penv"></span></label>
           <input type="range" id="pen" min="0.3" max="2.5" step="0.1" value="0.9">
           <small>Higher gives fewer, longer chords. Lower follows quick changes.</small>
-        </div>
+        </details>
       </div>
-    </section>
-
-    <section class="block" id="tcard">
-      <h2>Lyrics that follow the chords</h2>
-      <div class="row">
-        <select id="tlang" aria-label="Language of the singing">
-          <option value="">Detect the language</option>
-          <option value="english">English</option>
-          <option value="nepali">नेपाली (Nepali)</option>
-          <option value="hindi">हिन्दी (Hindi)</option>
-        </select>
-        <select id="tmodel" aria-label="Speech model">
-          <option value="Xenova/whisper-base">Base: many languages, roughly 100 MB</option>
-          <option value="Xenova/whisper-small">Small: many languages, best for Nepali, roughly 250 MB</option>
-          <option value="Xenova/whisper-tiny.en">Tiny: English only, roughly 40 MB, fastest</option>
-        </select>
-        <button class="btn primary small" id="trans">Transcribe this recording</button>
-      </div>
-      <div class="hint" id="tstat">Your audio stays on your device. The speech model downloads once and your browser keeps it. A full song takes a few minutes. Nepali accuracy is modest, and singing over instruments is often garbled.</div>
-      <div class="bar" id="tbar"><i id="tfill"></i></div>
-      <div class="sync" id="sync"></div>
-      <div class="row" style="margin-top:12px"><button class="btn small" id="tcopy" style="display:none">Copy chord sheet with lyrics</button><span class="status" id="tcopied" style="margin:0"></span></div>
-      <details style="margin-top:16px"><summary>Paste your own lyrics instead</summary>
-        <textarea id="paste" placeholder="Paste lyrics you have the right to use, to read along while the chords play." style="margin-top:8px;height:110px"></textarea>
-      </details>
-    </section>
-
-    <section class="block" id="notion">
-      <h2>Save to Notion</h2>
-      <div class="row">
-        <button class="btn primary small" id="nsave">Save this song to Notion</button>
-        <label class="chk"><input type="checkbox" id="nauto"> Save automatically after each song</label>
-      </div>
-      <div class="status" id="nstat" style="margin-top:10px"></div>
-      <details style="margin-top:10px" id="nset"><summary>Connection settings</summary>
-        <div class="hint" style="margin:8px 0">Paste the save address and passcode from your setup. They stay in this browser only.</div>
-        <input id="nurl" type="url" placeholder="Save address, like https://your-app.vercel.app/api/save" autocomplete="off" style="width:100%;margin-top:6px">
-        <input id="nkey" type="password" placeholder="Passcode" autocomplete="off" style="width:100%;margin-top:8px">
-        <div class="row" style="margin-top:8px"><button class="btn small" id="nsetsave">Save settings</button></div>
-      </details>
     </section>
 
     <section class="block">
       <h2>Chords by time</h2>
       <div id="list"></div>
-      <details style="margin-top:14px"><summary>Chord sheet as text</summary>
-        <textarea class="sheet" id="sheet" readonly style="margin-top:8px"></textarea>
-        <div class="row" style="margin-top:8px"><button class="btn small" id="copy">Copy</button><span class="status" id="copied" style="margin:0"></span></div>
-      </details>
+      <div class="row" style="margin-top:12px"><button class="btn small" id="copy">Copy chords</button><span class="status" id="copied" style="margin:0"></span></div>
     </section>
   </div>
 
-  <p class="foot">Chords are found with signal processing (a spectrum analysis plus chord matching), not a trained neural network. It does best on clear pop, rock and acoustic music with chords that last a bar or more, and gets less reliable with heavy distortion, dense mixes or fast jazz changes. Treat it as a strong starting point and check by ear. Colors follow the circle of fifths: chords that sit next to each other in a key have neighboring colors, major chords are filled and minor chords have a colored edge.</p>
+  <section class="block" id="notion">
+    <div class="row">
+      <button class="btn small" id="nsave" disabled>Save to Notion</button>
+      <label class="chk"><input type="checkbox" id="nauto"> Save every song automatically</label>
+    </div>
+    <div class="status" id="nstat" style="margin-top:10px"></div>
+    <details id="nset"><summary>Notion connection</summary>
+      <div class="hint" style="margin:8px 0">Paste the save address and passcode from your setup. They stay in this browser.</div>
+      <input id="nurl" type="url" placeholder="https://your-app.vercel.app/api/save" autocomplete="off" style="width:100%;margin-top:6px">
+      <input id="nkey" type="password" placeholder="Passcode" autocomplete="off" style="width:100%;margin-top:8px">
+      <div class="row" style="margin-top:8px"><button class="btn small" id="nsetsave">Save connection</button></div>
+    </details>
+  </section>
+
+  <p class="foot">Chords are found with signal processing, not a trained model. It works best on clear pop, rock and acoustic music, and is less reliable on heavy distortion, dense mixes or fast jazz. Treat it as a starting point and check by ear.</p>
 </main>
 
 <script>
@@ -492,10 +428,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   const $ = id => document.getElementById(id);
   const core = window.ChordCore, audio = $('audio'), NOTES = core.NOTES;
   let an = null, segs = [], dur = 0, objUrl = null, lastIdx = -2;
-  let fileBuf = null, tLines = [], tWorker = null, lastLine = -1, lastWord = -1;
-  let mic = null, usedSet = new Set(), keyPos = '';
+  let sheet = '', mic = null, usedSet = new Set(), keyPos = '';
   let song = { title: '', source: 'Uploaded file', when: null }, lastKeyName = '', savedFor = null, saving = false;
-  const chordLog = [], lyricLines = [];
 
   // ---------- helpers ----------
   const pretty = s => s.replace('#', '♯');
@@ -549,7 +483,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     const has = !!(c && c.root >= 0);
     $('cur').textContent = has ? pretty(c.label) : (mic ? 'Listening' : (segs.length ? 'Rest' : 'Ready'));
     $('cur').classList.toggle('on', has); $('cur').classList.toggle('idle', !has);
-    $('notes').innerHTML = has ? c.notes.map(n => `<span>${pretty(n)}</span>`).join('') : '';
     if (has) { $('cur').style.setProperty('--h', hueOf(c)); $('stage').style.setProperty('--h', hueOf(c)); }
     $('stage').classList.toggle('lit', has);
     ringPaint(has ? c : null);
@@ -585,7 +518,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   // ---------- analysing a song or a finished recording ----------
   async function analyse(samples, sr, url) {
     try {
-      tLines = []; renderSync();
       if (objUrl) URL.revokeObjectURL(objUrl);
       objUrl = url; audio.src = url;
       const d = core.downsample(samples, sr, 22050);
@@ -605,7 +537,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     status('Reading ' + file.name + '…'); progress(0.02);
     try {
       const buf = await file.arrayBuffer();
-      fileBuf = buf.slice(0);
       song = { title: file.name.replace(/\.[^.\/\\]+$/, '').trim() || 'Untitled song', source: 'Uploaded file', when: new Date() };
       const ab = await decodeAudio(buf);
       await analyse(toMono(ab), ab.sampleRate, URL.createObjectURL(file));
@@ -628,18 +559,17 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     segs.forEach(s => {
       const d = document.createElement('div'); d.className = 'li';
       const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmt(s.t0);
-      const nt = document.createElement('span'); nt.className = 'nt';
-      if (s.root >= 0) s.notes.forEach(n => { const i = document.createElement('span'); i.textContent = pretty(n); nt.appendChild(i); });
       const cell = document.createElement('span');
       if (s.root < 0) { cell.textContent = '(rest)'; cell.style.color = 'var(--faint)'; } else cell.appendChild(chip(s));
-      d.append(tm, cell, nt);
+      d.append(tm, cell);
       d.onclick = () => { audio.currentTime = s.t0 + 0.01; };
       $('list').appendChild(d);
     });
     const real = segs.filter(s => s.root >= 0);
-    $('sheet').value = 'Key (estimated): ' + (r.key || '?') + '\n\n' + segs.map(s => fmt(s.t0).padEnd(6) + (s.root < 0 ? '(rest)' : s.label)).join('\n') +
+    sheet = 'Key (estimated): ' + (r.key || '?') + '\n\n' + segs.map(s => fmt(s.t0).padEnd(6) + (s.root < 0 ? '(rest)' : s.label)).join('\n') +
       '\n\nProgression:\n' + real.map(s => s.label).join(' | ');
-    lastIdx = -2; renderSync(); tick();
+    $('nsave').disabled = false;
+    lastIdx = -2; tick();
   }
 
   function findIdx(t) { let lo = 0, hi = segs.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (segs[m].t0 <= t) lo = m; else hi = m - 1; } return lo; }
@@ -647,7 +577,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     if (segs.length && !mic) {
       const t = audio.currentTime || 0, i = findIdx(t), s = segs[i];
       $('ph').style.left = (t / dur * 100) + '%';
-      syncTick(t);
       if (i !== lastIdx) {
         lastIdx = i; showChord(s);
         let nx = null; for (let j = i + 1; j < segs.length; j++) if (segs[j].root >= 0) { nx = segs[j]; break; }
@@ -676,228 +605,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     if (mic) await stopMic(true);
     const prog = ['C', 'G', 'Am', 'F', 'C', 'G', 'F', 'C'], sr = 22050;
     const x = core.synthProgression(prog, sr, 2, { noise: 0.02, melody: true });
-    fileBuf = null; analyse(x, sr, URL.createObjectURL(wavBlob(x, sr)));
+    analyse(x, sr, URL.createObjectURL(wavBlob(x, sr)));
   });
   $('copy').addEventListener('click', async () => {
-    const ta = $('sheet');
-    try { await navigator.clipboard.writeText(ta.value); $('copied').textContent = 'Copied.'; }
-    catch (e) { ta.select(); $('copied').textContent = 'Text selected. Press Ctrl or Cmd+C.'; }
-  });
-
-  // ---------- transcribe a file or recording (Whisper in a background worker) + chord sync ----------
-  const WORKER_SRC = `
-    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js';
-    env.allowLocalModels = false;
-    let asr = null, loaded = '';
-    const files = {};
-    self.onmessage = async (e) => {
-      const { model, audio, lang } = e.data;
-      try {
-        if (!asr || loaded !== model) {
-          asr = await pipeline('automatic-speech-recognition', model, { progress_callback: (p) => {
-            if (p && p.status === 'progress' && p.file) {
-              files[p.file] = { l: p.loaded || 0, t: p.total || 0 };
-              let l = 0, t = 0; for (const k in files) { l += files[k].l; t += files[k].t; }
-              self.postMessage({ type: 'download', pct: t ? Math.min(100, l / t * 100) : 0 });
-            }
-          } });
-          loaded = model;
-        }
-        self.postMessage({ type: 'transcribing' });
-        const opts = { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5 };
-        if (!model.endsWith('.en')) { opts.task = 'transcribe'; if (lang) opts.language = lang; }
-        const out = await asr(audio, opts);
-        self.postMessage({ type: 'done', chunks: out.chunks || [], text: out.text || '' });
-      } catch (err) { self.postMessage({ type: 'error', msg: String((err && err.message) || err) }); }
-    };`;
-  const tstat = (m, err) => { $('tstat').textContent = m; $('tstat').className = 'hint' + (err ? ' err' : ''); };
-  const tbar = p => { $('tbar').style.display = p == null ? 'none' : 'block'; $('tfill').style.width = (p || 0) + '%'; };
-
-  async function audio16k(buf) {
-    const ab = await decodeAudio(buf.slice(0), 16000);
-    let x = toMono(ab);
-    if (Math.abs(ab.sampleRate - 16000) > 1) {
-      const r = ab.sampleRate / 16000, y = new Float32Array(Math.floor(x.length / r));
-      for (let i = 0; i < y.length; i++) { const f = i * r, j = Math.floor(f), a = x[j], b = x[j + 1] === undefined ? a : x[j + 1]; y[i] = a + (b - a) * (f - j); }
-      x = y;
-    }
-    return x;
-  }
-  function cleanChunks(chunks) {
-    const out = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const text = (chunks[i].text || '').replace(/\s+/g, ' ').trim();
-      if (!text) continue;
-      if (/^[\[(*♪\s].*[\])*♪\s]$/.test(text) && text.length < 40) continue;
-      const ts = chunks[i].timestamp || [0, null];
-      let t0 = ts[0] == null ? 0 : ts[0], t1 = ts[1];
-      if (t1 == null) { const nx = chunks.slice(i + 1).find(c => c.timestamp && c.timestamp[0] != null); t1 = nx ? nx.timestamp[0] : dur; }
-      if (t1 <= t0) t1 = t0 + 2;
-      if (out.length && out[out.length - 1].text.toLowerCase() === text.toLowerCase()) continue;
-      out.push({ t0, t1, text });
-    }
-    return out;
-  }
-  function placeChords(l) {
-    const words = l.text.split(' '), total = l.text.length || 1, wt = [];
-    let pos = 0;
-    for (const w of words) { wt.push(l.t0 + (pos / total) * (l.t1 - l.t0)); pos += w.length + 1; }
-    const at = words.map(() => []); let last = '';
-    for (const s of segs) {
-      if (s.root < 0 || s.t1 <= l.t0 || s.t0 >= l.t1) continue;
-      if (s.t0 > l.t0 && s.t0 > l.t1 - 0.4) continue;
-      const when = Math.max(s.t0, l.t0);
-      let wi = 0; for (let i = 0; i < wt.length; i++) if (wt[i] <= when + 0.15) wi = i;
-      if (s.label === last) continue; last = s.label;
-      at[wi].push(s);
-    }
-    return { words, wt, at };
-  }
-  function renderSync() {
-    const box = $('sync'); box.innerHTML = ''; lastLine = -1; lastWord = -1;
-    if (!tLines.length) { box.style.display = 'none'; $('tcopy').style.display = 'none'; return; }
-    box.style.display = 'block'; $('tcopy').style.display = 'inline-flex';
-    tLines.forEach(l => {
-      const { words, wt, at } = placeChords(l);
-      l.wt = wt; l.wordEls = [];
-      const row = document.createElement('div'); row.className = 'sl';
-      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmt(l.t0);
-      const wd = document.createElement('div'); wd.className = 'words';
-      words.forEach((w, k) => {
-        const cell = document.createElement('span'); cell.className = 'w';
-        const c = document.createElement('span'); c.className = 'c';
-        at[k].forEach(s => { const n = document.createElement('span'); n.textContent = pretty(s.label); n.style.setProperty('--h', hueOf(s)); c.appendChild(n); });
-        const x = document.createElement('span'); x.className = 'x'; x.textContent = w;
-        cell.append(c, x); wd.appendChild(cell); l.wordEls.push(cell);
-      });
-      l.sheet = { words, at };
-      row.append(tm, wd); row.onclick = () => { audio.currentTime = l.t0 + 0.01; };
-      l.row = row; box.appendChild(row);
-    });
-  }
-  function syncTick(t) {
-    if (!tLines.length) return;
-    let li = -1; for (let i = 0; i < tLines.length; i++) { if (tLines[i].t0 <= t + 0.05) li = i; else break; }
-    if (li >= 0 && t > tLines[li].t1 + 1.5) li = -1;
-    if (li !== lastLine) {
-      if (lastLine >= 0 && tLines[lastLine]) tLines[lastLine].row.classList.remove('on');
-      lastLine = li; lastWord = -1;
-      if (li >= 0) {
-        const r = tLines[li].row; r.classList.add('on');
-        const B = $('sync'); if (r.offsetTop < B.scrollTop || r.offsetTop + r.offsetHeight > B.scrollTop + B.clientHeight) B.scrollTop = Math.max(0, r.offsetTop - 60);
-      }
-    }
-    if (li >= 0) {
-      const l = tLines[li]; let wi = 0; for (let i = 0; i < l.wt.length; i++) if (l.wt[i] <= t) wi = i;
-      if (wi !== lastWord) { if (lastWord >= 0 && l.wordEls[lastWord]) l.wordEls[lastWord].classList.remove('hl'); l.wordEls[wi].classList.add('hl'); lastWord = wi; }
-    }
-  }
-  function sheetText() {
-    return tLines.map(l => {
-      let c = '', w = '';
-      l.sheet.words.forEach((word, i) => {
-        const chord = l.sheet.at[i].map(s => s.label).join(' '), width = Math.max(word.length, chord.length) + 1;
-        c += chord.padEnd(width); w += word.padEnd(width);
-      });
-      return fmt(l.t0) + '\n' + c.trimEnd() + '\n' + w.trimEnd();
-    }).join('\n\n');
-  }
-  function finishTranscribe(msg, err) {
-    if (tWorker) { tWorker.terminate(); tWorker = null; }
-    $('trans').disabled = false; tbar(null); tstat(msg, err);
-  }
-  $('tlang').addEventListener('change', () => {
-    const l = $('tlang').value;
-    if (l && l !== 'english' && $('tmodel').value.endsWith('.en')) $('tmodel').value = l === 'nepali' ? 'Xenova/whisper-small' : 'Xenova/whisper-base';
-    if (l === 'nepali') tstat('For Nepali, the Small model is noticeably better than Base, but the download is larger. Clear speech works much better than singing.');
-  });
-  $('trans').addEventListener('click', async () => {
-    if (tWorker) return;
-    if (!fileBuf) { tstat('Transcription needs an uploaded song or a recording you made. The demo has no singing in it.', true); return; }
-    const model = $('tmodel').value, lang = $('tlang').value;
-    if (model.endsWith('.en') && lang && lang !== 'english') { tstat('The Tiny model only does English. Pick Base or Small for this language.', true); return; }
-    $('trans').disabled = true; tstat('Preparing the audio…'); tbar(0);
-    let audioData;
-    try { audioData = await audio16k(fileBuf); } catch (e) { finishTranscribe('Could not read that audio for transcription.', true); return; }
-    const FAIL = 'Could not load the speech model. This needs an internet connection and a normal web page, so it works on your GitHub site but not inside the Claude preview.';
-    try { tWorker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' })), { type: 'module' }); }
-    catch (e) { finishTranscribe(FAIL, true); return; }
-    let started = 0, timer = null;
-    tWorker.onerror = () => { clearInterval(timer); finishTranscribe(FAIL, true); };
-    tWorker.onmessage = ev => {
-      const m = ev.data;
-      if (m.type === 'download') { tbar(m.pct); tstat('Downloading the speech model… ' + Math.round(m.pct) + '% (only the first time)'); }
-      else if (m.type === 'transcribing') {
-        tbar(null); started = Date.now();
-        timer = setInterval(() => tstat('Transcribing… ' + Math.round((Date.now() - started) / 1000) + 's. Keep this tab open.'), 1000);
-        tstat('Transcribing… keep this tab open.');
-      }
-      else if (m.type === 'done') {
-        clearInterval(timer);
-        tLines = cleanChunks(m.chunks); renderSync();
-        finishTranscribe(tLines.length ? 'Done: ' + tLines.length + ' lines. Click a line to jump there. Chord names sit above the words where the chord changes.' : 'No words were recognised. Songs with loud instruments often defeat speech recognition; a clearer vocal works much better.');
-      }
-      else if (m.type === 'error') { clearInterval(timer); finishTranscribe('Transcription failed: ' + m.msg, true); }
-    };
-    tWorker.postMessage({ model, audio: audioData, lang }, [audioData.buffer]);
-  });
-  $('tcopy').addEventListener('click', async () => {
-    const txt = sheetText();
-    try { await navigator.clipboard.writeText(txt); $('tcopied').textContent = 'Copied.'; }
-    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.className = 'sheet'; ta.style.cssText = 'height:160px;margin-top:8px'; $('tcopied').after(ta); ta.select(); $('tcopied').textContent = 'Select the text below and copy it.'; }
-  });
-
-  // ---------- live lyrics (browser speech-to-text), tagged with chords ----------
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let rec = null, recWant = false, curLine = null;
-  function chordsFor(line) {
-    const out = []; let base = null;
-    for (const c of chordLog) { if (c.t <= line.t0) base = c; }
-    if (base && base.label) out.push(base);
-    for (const c of chordLog) if (c.t > line.t0 && c.label && (!out.length || out[out.length - 1].label !== c.label)) out.push(c);
-    return out;
-  }
-  function drawLine(line, interim) {
-    line.chipsEl.innerHTML = ''; chordsFor(line).forEach(c => line.chipsEl.appendChild(chip(c)));
-    line.txtEl.textContent = line.text; line.t1 = performance.now(); line.el.classList.toggle('interim', interim);
-    const L = $('lyrics'); L.scrollTop = L.scrollHeight;
-  }
-  function newLine() {
-    const el = document.createElement('div'); el.className = 'll';
-    el.innerHTML = '<div class="chips"></div><div class="txt"></div>';
-    $('lyrics').appendChild(el); $('lyrics').style.display = 'block';
-    const line = { t0: performance.now(), t1: performance.now(), text: '', el, chipsEl: el.firstChild, txtEl: el.lastChild };
-    lyricLines.push(line); return line;
-  }
-  function resetLyrics() { lyricLines.length = 0; curLine = null; $('lyrics').innerHTML = ''; $('lyrics').style.display = 'none'; }
-  function startLyrics() {
-    if (!SR) { $('lyrnote').textContent = 'This browser can\'t do speech-to-text. Chrome on a computer or Android usually can.'; $('lyr').checked = false; return; }
-    rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = $('lang').value || navigator.language || 'en-US';
-    rec.onresult = e => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i], txt = (r[0].transcript || '').trim(); if (!txt) continue;
-        if (!curLine) curLine = newLine();
-        curLine.text = txt; drawLine(curLine, !r.isFinal);
-        if (r.isFinal) curLine = null;
-      }
-    };
-    rec.onerror = e => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Speech-to-text was blocked. Allow it when the browser asks, or use the paste box after you stop.'; }
-      else if (e.error === 'language-not-supported') { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'This browser has no live speech-to-text for that language. Chrome on a computer or Android supports Nepali; after you stop, the "Transcribe this recording" button can also try Nepali.'; }
-    };
-    rec.onend = () => { if (recWant) { try { rec.start(); } catch (e) {} } };
-    recWant = true;
-    try { rec.start(); $('lyrnote').textContent = 'Transcribing… words appear below with the chords heard at that moment. Expect mistakes on music.'; }
-    catch (e) { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Could not start speech-to-text.'; }
-  }
-  function stopLyrics() { recWant = false; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } }
-  $('lyr').addEventListener('change', () => { if (!mic) { $('lyr').checked = false; return; } $('lyr').checked ? startLyrics() : (stopLyrics(), $('lyrnote').textContent = 'Off.'); });
-  $('lang').addEventListener('change', () => { if (rec && recWant) { stopLyrics(); startLyrics(); } });
-  $('lyrcopy').addEventListener('click', async () => {
-    const txt = lyricLines.filter(l => l.text).map(l => chordsFor(l).map(c => c.label).join(' ') + '\n' + l.text).join('\n\n');
-    if (!txt) { $('lyrcopied').textContent = 'Nothing to copy yet.'; return; }
-    try { await navigator.clipboard.writeText(txt); $('lyrcopied').textContent = 'Copied.'; }
-    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.className = 'sheet'; ta.style.cssText = 'height:120px;margin-top:8px'; $('lyrcopied').after(ta); ta.select(); $('lyrcopied').textContent = 'Select the text below and copy it.'; }
+    try { await navigator.clipboard.writeText(sheet); $('copied').textContent = 'Copied.'; }
+    catch (e) { $('copied').textContent = 'Could not copy on this browser.'; }
   });
 
   // ---------- live microphone: listen, record, then play back ----------
@@ -909,7 +621,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
     catch (e) { status(e && e.name === 'NotFoundError' ? 'No microphone found on this device.' : MIC_BLOCKED, true); return; }
-    audio.pause(); segs = []; an = null; tLines = []; renderSync(); setUsed([]); setKey(''); $('session').style.display = 'none';
+    audio.pause(); segs = []; an = null; sheet = ''; $('nsave').disabled = true; setUsed([]); setKey(''); $('session').style.display = 'none';
     const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
     try { await ctx.resume(); } catch (e) {}
     const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain();
@@ -924,7 +636,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     };
     src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
     $('live').style.display = 'block'; $('rec').style.display = 'inline-block';
-    chordLog.length = 0; resetLyrics();
     $('heard').innerHTML = ''; showChord(null); $('next').textContent = 'Listening…';
     $('lhint').textContent = 'Play some music near the microphone. Everything is recorded (up to 10 minutes), so when you stop you can play it back with the chords.';
     $('mic').disabled = true; status('Listening through your microphone.');
@@ -940,7 +651,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
         if (r.label === m.cand) m.count++; else { m.cand = r.label; m.count = 1; }
         if (m.count >= 2 && r.label !== m.shown) {
           m.shown = r.label;
-          chordLog.push({ t: performance.now(), label: r.root < 0 ? null : r.label, root: r.root, q: r.q });
           showChord(r);
           if (r.root >= 0) {
             m.heardList.push(r); setUsed(m.heardList); ringPaint(r);
@@ -956,7 +666,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   async function stopMic(silent) {
     if (!mic) return;
     const m = mic; mic = null;
-    stopLyrics(); $('lyr').checked = false; clearInterval(m.timer);
+    clearInterval(m.timer);
     const sr = m.ctx.sampleRate;
     try { m.proc.disconnect(); m.src.disconnect(); m.mute.disconnect(); } catch (e) {}
     m.stream.getTracks().forEach(t => t.stop());
@@ -964,13 +674,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     $('live').style.display = 'none'; $('rec').style.display = 'none'; $('lvl').style.width = '0'; $('mic').disabled = false;
     if (m.len < sr * 3) { status('That was too short to save. Record at least 3 seconds.', true); showChord(null); $('next').textContent = ''; return; }
     const x = new Float32Array(m.len); let o = 0; for (const c of m.chunks) { x.set(c, o); o += c.length; }
-    const lines = lyricLines.filter(l => l.text).map(l => ({ text: l.text, t0: Math.max(0, (l.t0 - m.t0) / 1000), t1: Math.max((l.t1 - m.t0) / 1000, (l.t0 - m.t0) / 1000 + 1.5) }));
     const blob = wavBlob(x, sr);
-    fileBuf = await blob.arrayBuffer();
     song = { title: 'Recording, ' + whenLabel(m.startedAt), source: 'Recording', when: m.startedAt };
     if (silent) { status(''); }
     await analyse(x, sr, URL.createObjectURL(blob));
-    if (lines.length) { tLines = lines; renderSync(); }
     status('Saved your recording. Press play to hear it back with the chords.');
     $('session').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -988,14 +695,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       whenText: d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
       key: lastKeyName || null, durationSec: Math.round(dur), use7: $('use7').checked,
       chords: segs.filter(c => c.root >= 0).map(c => ({ t: Math.round(c.t0 * 10) / 10, label: c.label })),
-      lyrics: tLines.length ? sheetText() : null,
     };
   }
   async function saveNotion(auto) {
     if (saving || !segs.length) return;
     const c = cfg();
     if (!c.url || !c.key) { $('nset').open = true; nstat('Add your save address and passcode first.', true); return; }
-    const sig = JSON.stringify([song.title, segs.length, $('use7').checked, tLines.length]);
+    const sig = JSON.stringify([song.title, segs.length, $('use7').checked]);
     if (savedFor === sig && auto !== true) { nstat('Already saved. Change something, or this song would be added twice.', true); return; }
     saving = true; $('nsave').disabled = true; nstat('Saving "' + song.title + '"…');
     try {
@@ -1015,7 +721,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     catch (e) { nstat('This browser would not store the settings.', true); }
   });
   $('nauto').addEventListener('change', () => { try { localStorage.setItem('cbc_auto', $('nauto').checked ? '1' : '0'); } catch (e) {} });
-  (function () { const c = cfg(); $('nurl').value = c.url; $('nkey').value = c.key; $('nauto').checked = c.auto; if (!c.url) $('nset').open = true; })();
+  (function () { const c = cfg(); $('nurl').value = c.url; $('nkey').value = c.key; $('nauto').checked = c.auto; })();
 
   ringPaint(null);
   requestAnimationFrame(tick);

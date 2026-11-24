@@ -36,7 +36,6 @@ function validate(p) {
   if (p.key != null && (typeof p.key !== 'string' || p.key.length > 40)) return 'Bad key.';
   if (!Array.isArray(p.chords) || p.chords.length < 1 || p.chords.length > 3000) return 'No chords to save.';
   for (const c of p.chords) if (!c || typeof c.t !== 'number' || typeof c.label !== 'string' || c.label.length > 12) return 'Bad chord list.';
-  if (p.lyrics != null && (typeof p.lyrics !== 'string' || p.lyrics.length > 60000)) return 'Lyrics are too long.';
   return null;
 }
 
@@ -55,8 +54,6 @@ function buildBlocks(p) {
     { object: 'block', type: 'toggle', toggle: { rich_text: richText('Chords by time'), children: [
       { object: 'block', type: 'code', code: { language: 'plain text', rich_text: richText(timed) } }] } },
   ];
-  if (p.lyrics && p.lyrics.trim()) blocks.push({ object: 'block', type: 'toggle', toggle: { rich_text: richText('Lyrics with chords'), children: [
-    { object: 'block', type: 'code', code: { language: 'plain text', rich_text: richText(p.lyrics) } }] } });
   return blocks;
 }
 

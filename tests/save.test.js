@@ -9,7 +9,7 @@ function call(method, headers, body) {
   });
 }
 const good = { title: 'Hotel Nepal', source: 'Uploaded file', whenText: 'Nov 24, 2026, 3:05 PM', key: 'D major', durationSec: 222, use7: false,
-  chords: [{ t: 0, label: 'D' }, { t: 2, label: 'G' }, { t: 4, label: 'A' }, { t: 6, label: 'F#m' }, { t: 8, label: 'D' }], lyrics: null };
+  chords: [{ t: 0, label: 'D' }, { t: 2, label: 'G' }, { t: 4, label: 'A' }, { t: 6, label: 'F#m' }, { t: 8, label: 'D' }] };
 
 (async () => {
   let sent = null;
@@ -40,12 +40,10 @@ const good = { title: 'Hotel Nepal', source: 'Uploaded file', whenText: 'Nov 24,
   assert.equal(kids[3].callout.rich_text[0].text.content, 'D  |  G  |  A  |  F♯m  |  D');   // consecutive repeats collapsed, sharps pretty
   assert.equal(kids[4].toggle.children[0].code.rich_text[0].text.content.split('\n')[3], '0:06  F♯m');
 
-  const withLyrics = { ...good, lyrics: 'x'.repeat(4500) };
-  await call('POST', { 'x-save-key': 'letmein' }, withLyrics);
-  const k2 = JSON.parse(sent.opts.body).children;
-  assert.equal(k2.length, 6, 'lyrics toggle added');
-  const parts = k2[5].toggle.children[0].code.rich_text;
-  assert.ok(parts.length === 3 && parts.every(p => p.text.content.length <= 2000), 'long text split under the 2000 limit');
+  const many = { ...good, chords: Array.from({ length: 600 }, (_, k) => ({ t: k * 2, label: k % 2 ? 'G' : 'Am' })) };
+  await call('POST', { 'x-save-key': 'letmein' }, many);
+  const parts = JSON.parse(sent.opts.body).children[4].toggle.children[0].code.rich_text;
+  assert.ok(parts.length > 1 && parts.every(p => p.text.content.length <= 2000), 'long text split under the 2000 limit');
 
   global.fetch = async () => ({ ok: false, status: 404, json: async () => ({ message: 'Could not find block' }) });
   const nf = await call('POST', { 'x-save-key': 'letmein' }, good);
