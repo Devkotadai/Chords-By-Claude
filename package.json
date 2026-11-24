@@ -1,0 +1,8 @@
+{
+  "name": "chords-by-claude",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Listens to a song and shows its chords. Optional: saves each song to a Notion page.",
+  "scripts": { "test": "node tests/save.test.js" },
+  "engines": { "node": ">=18" }
+}
