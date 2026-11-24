@@ -4,174 +4,227 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chords by Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0f1218; --panel:#171b24; --ink:#eef0f5; --muted:#8a92a6; --line:#262c39; --accent:#7cc4ff; }
+  :root {
+    --bg:#0A0E1A; --raise:#121829; --raise2:#1B2440; --line:#222B44;
+    --ink:#F3F5FA; --mute:#98A2BD; --faint:#6B7694; --h:250;
+    --display:'Unbounded', system-ui, sans-serif;
+    --body:'Figtree','Noto Sans Devanagari', system-ui, sans-serif;
+  }
+  html { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 28px 18px 60px; }
-  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.02em; }
-  .sub { color: var(--muted); margin: 0 0 22px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
-  .drop { display:block; text-align:center; border:2px dashed var(--line); border-radius:14px; padding:34px 16px; cursor:pointer; transition:.15s; background:var(--panel); }
-  .drop:hover, .drop.over { border-color: var(--accent); background:#1a2130; }
-  .drop b { font-size: 18px; } .drop span { color: var(--muted); display:block; margin-top:4px; font-size:14px; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:400 16px/1.55 var(--body); }
+  main { max-width: 980px; margin: 0 auto; padding: 22px 20px 90px; overflow-x: clip; }
+  :focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 6px; }
+
+  .mark { font: 700 15px var(--display); letter-spacing: -.01em; }
+
+  /* ---- stage: ring + current chord ---- */
+  .stage { position:relative; isolation:isolate; display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:28px 44px; align-items:center; padding:26px 0 18px; }
+  .stage::before { content:''; position:absolute; inset:-30px -20px; z-index:-1; opacity:0; transition:opacity .5s; pointer-events:none;
+    background: radial-gradient(55% 90% at 22% 50%, oklch(0.8 0.15 var(--h) / .22), transparent 70%); }
+  .stage.lit::before { opacity:1; }
+  @media (max-width:720px){ .stage { grid-template-columns:1fr; justify-items:center; text-align:center; gap:14px; padding-top:12px; } .notes, .nextline { justify-content:center; } }
+  #ring { width:100%; max-width:300px; height:auto; }
+  @media (max-width:720px){ #ring { max-width:220px; } }
+  #ring text { font:600 12px var(--body); pointer-events:none; }
+  .big { font:700 clamp(56px, 12vw, 108px)/1 var(--display); letter-spacing:-.04em; color:var(--faint); margin:0; min-height:1em; }
+  .big.on { color: oklch(0.84 0.14 var(--h)); }
+  .big.idle { font-size:clamp(34px, 7vw, 56px); font-weight:500; letter-spacing:-.02em; }
+  .notes { display:flex; gap:12px; font-weight:600; font-size:18px; color:var(--mute); min-height:1.7em; margin-top:10px; }
+  .nextline { color:var(--mute); margin-top:4px; min-height:1.6em; display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; }
+  .nextline b { color:var(--ink); font-weight:600; }
+  .keychip { display:inline-block; margin-top:10px; font-size:14px; color:var(--mute); }
+  .keychip b { color:var(--ink); font-weight:600; }
+
+  /* ---- buttons ---- */
+  .btn { font:600 15px var(--body); color:var(--ink); background:transparent; border:1px solid #33406A; border-radius:999px; padding:10px 20px; cursor:pointer; display:inline-flex; gap:8px; align-items:center; text-decoration:none; transition:background .15s, border-color .15s; }
+  .btn:hover { background:var(--raise2); border-color:#4B5B94; }
+  .btn.primary { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .btn.primary:hover { background:#fff; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.small { padding:6px 14px; font-size:14px; }
   input[type=file] { display:none; }
-  button { font:inherit; color:var(--ink); background:#212837; border:1px solid var(--line); border-radius:9px; padding:8px 14px; cursor:pointer; }
-  button:hover { border-color: var(--accent); }
   .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-  .status { color: var(--muted); font-size: 14px; min-height: 22px; margin: 10px 2px 0; }
-  .bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:8px; display:none; }
-  .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .1s; }
-  #app { display:none; }
-  audio { width:100%; margin-bottom: 14px; }
-  .now { display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; }
-  .big { font-size: clamp(64px, 16vw, 112px); font-weight: 700; line-height: 1; letter-spacing: -.03em; min-width: 2ch; }
-  .meta { padding-bottom: 8px; }
-  .notes { color: var(--muted); font-size: 15px; }
-  .next { color: var(--muted); font-size: 15px; margin-top: 2px; } .next b { color: var(--ink); }
-  .chip { display:inline-block; background:#212837; border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:2px 11px; font-size:13px; margin-left:8px; vertical-align:middle; }
-  .tl { position:relative; height:46px; background:#0c0f14; border-radius:9px; overflow:hidden; cursor:pointer; margin-top:6px; }
-  .seg { position:absolute; top:0; bottom:0; border-right:1px solid #0c0f14; color:#fff; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; overflow:hidden; white-space:nowrap; opacity:.92; }
-  .play { position:absolute; top:0; bottom:0; width:2px; background:#fff; box-shadow:0 0 6px #fff; pointer-events:none; }
-  .ctrl { display:grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; }
-  @media (max-width:600px){ .ctrl { grid-template-columns: 1fr; } }
-  label.t { display:flex; gap:8px; align-items:center; cursor:pointer; }
-  .ctrl small { color: var(--muted); display:block; }
-  input[type=range] { width:100%; accent-color: var(--accent); }
-  #list { position:relative; max-height: 300px; overflow:auto; border:1px solid var(--line); border-radius:10px; }
-  .li { display:flex; gap:14px; padding:7px 12px; border-bottom:1px solid var(--line); cursor:pointer; align-items:baseline; }
-  .li:last-child { border-bottom:0; } .li:hover { background:#1c2230; }
-  .li.on { background:#22304a; }
-  .li .tm { color:var(--muted); width:48px; font-variant-numeric: tabular-nums; }
-  .li .ch { font-weight:700; width:70px; } .li .nt { color:var(--muted); font-size:14px; }
-  h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight:600; text-transform: uppercase; letter-spacing:.06em; }
-  textarea { width:100%; height:150px; background:#0c0f14; color:var(--ink); border:1px solid var(--line); border-radius:9px; padding:10px; font:13px/1.4 ui-monospace,Menlo,monospace; }
-  .lvl { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:14px; }
-  .lvl i { display:block; height:100%; width:0; background:#5ad19a; transition:width .15s; }
-  .heard { display:flex; flex-wrap:wrap; gap:6px; max-height:140px; overflow:auto; }
-  .hc { padding:3px 10px; border-radius:7px; font-weight:700; font-size:14px; color:#fff; }
-  .rec { display:inline-block; width:9px; height:9px; border-radius:50%; background:#ff5a5a; margin-right:8px; animation: pulse 1.2s infinite; }
+  #sources { position:relative; z-index:1; }
+  #sources.over .btn.primary { outline:2px dashed #fff; outline-offset:4px; }
+  .status { color:var(--mute); font-size:14px; min-height:22px; margin:12px 2px 0; }
+  .status.err, .err { color:#FF9AA2; }
+  .bar { height:3px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:8px; display:none; }
+  .bar i { display:block; height:100%; width:0; background:var(--ink); transition:width .1s; }
+
+  /* ---- chord chips (shared) ---- */
+  .cc { display:inline-block; padding:5px 12px 4px; border-radius:9px; font:700 14px var(--display); letter-spacing:-.02em; text-align:center; }
+  .cc small { display:block; font:500 11px var(--body); letter-spacing:0; opacity:.75; margin-top:1px; }
+  .cc.maj { background:oklch(0.8 0.15 var(--h)); color:#0A0E1A; }
+  .cc.min { background:var(--raise2); color:oklch(0.86 0.13 var(--h)); box-shadow: inset 0 -3px 0 oklch(0.8 0.15 var(--h)); }
+  .cc.min small { color:var(--mute); }
+
+  /* ---- sections ---- */
+  section.block { border-top:1px solid var(--line); padding:26px 0; }
+  h2 { font:600 19px/1.3 var(--body); margin:0 0 14px; letter-spacing:-.01em; }
+  .hint { color:var(--mute); font-size:14px; margin:8px 0 0; max-width:68ch; }
+  #live, #session { display:none; }
+  .rec { display:inline-block; width:9px; height:9px; border-radius:50%; background:#FF5A6E; margin-right:10px; animation:pulse 1.3s infinite; }
   @keyframes pulse { 50% { opacity:.25; } }
-  .lyrics { max-height:260px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:6px 12px; margin-top:8px; }
-  .ll { padding:8px 0; border-bottom:1px solid var(--line); } .ll:last-child { border-bottom:0; }
-  .ll .chips { display:flex; gap:5px; flex-wrap:wrap; min-height:22px; margin-bottom:3px; }
-  .ll .chips .hc { font-size:12px; padding:1px 8px; }
-  .ll .txt { font-size:17px; } .ll.interim .txt { color:var(--muted); font-style:italic; }
-  .sync { max-height:420px; overflow:auto; border:1px solid var(--line); border-radius:10px; margin-top:12px; display:none; }
-  .sl { display:flex; gap:12px; padding:10px 12px; border-bottom:1px solid var(--line); border-left:3px solid transparent; cursor:pointer; }
-  .sl:last-child { border-bottom:0; } .sl:hover { background:#1c2230; }
-  .sl.on { background:#1d2638; border-left-color:var(--accent); }
-  .sl .tm { color:var(--muted); width:40px; flex:none; font-variant-numeric:tabular-nums; padding-top:20px; font-size:13px; }
-  .words { display:flex; flex-wrap:wrap; gap:2px 9px; align-items:flex-start; }
+  @media (prefers-reduced-motion: reduce){ .rec { animation:none; } .stage::before { transition:none; } }
+  .lvl { height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin:14px 0 18px; }
+  .lvl i { display:block; height:100%; width:0; background:#6EE7B7; transition:width .15s; }
+  .heard { display:flex; flex-wrap:wrap; gap:8px; max-height:190px; overflow:auto; padding:2px; }
+
+  audio { width:100%; margin:0 0 16px; }
+  .tl { position:relative; height:60px; background:#0E1424; border-radius:12px; overflow:hidden; cursor:pointer; }
+  .seg { position:absolute; top:5px; bottom:5px; margin-left:1px; border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; white-space:nowrap; font:700 13px var(--display); letter-spacing:-.02em; }
+  .seg.maj { background:oklch(0.8 0.15 var(--h)); color:#0A0E1A; }
+  .seg.min { background:var(--raise2); color:oklch(0.86 0.13 var(--h)); box-shadow: inset 0 -4px 0 oklch(0.8 0.15 var(--h)); }
+  .seg.rest { background:transparent; }
+  .play { position:absolute; top:0; bottom:0; width:2px; background:#fff; box-shadow:0 0 8px #fff; pointer-events:none; }
+
+  .ctrl { display:grid; grid-template-columns:1fr 1fr; gap:14px 36px; }
+  @media (max-width:640px){ .ctrl { grid-template-columns:1fr; } }
+  label.t { display:flex; gap:10px; align-items:center; cursor:pointer; }
+  input[type=checkbox] { accent-color:#fff; width:18px; height:18px; }
+  input[type=range] { width:100%; accent-color:#fff; }
+  .ctrl small, .small { color:var(--mute); display:block; font-size:13px; }
+  select { font:500 15px var(--body); color:var(--ink); background:var(--raise); border:1px solid #33406A; border-radius:10px; padding:9px 12px; max-width:100%; }
+  textarea { width:100%; height:150px; background:#0E1424; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:12px; font:14px/1.5 var(--body); }
+  textarea.sheet { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; }
+
+  /* ---- chord list ---- */
+  #list { max-height:320px; overflow:auto; position:relative; border-radius:12px; background:var(--raise); }
+  .li { display:grid; grid-template-columns:52px 84px 1fr; gap:10px; padding:9px 14px; cursor:pointer; align-items:center; border-bottom:1px solid var(--line); }
+  .li:last-child { border-bottom:0; } .li:hover { background:var(--raise2); }
+  .li.on { background:#1F2B4D; }
+  .li .tm { color:var(--mute); font-variant-numeric:tabular-nums; }
+  .li .nt { color:var(--mute); font-size:14px; display:flex; gap:10px; }
+
+  /* ---- lyrics: live + synced ---- */
+  .lyrics { max-height:260px; overflow:auto; border-radius:12px; background:var(--raise); padding:6px 14px; margin-top:12px; display:none; }
+  .ll { padding:10px 0; border-bottom:1px solid var(--line); } .ll:last-child { border-bottom:0; }
+  .ll .chips { display:flex; gap:5px; flex-wrap:wrap; min-height:24px; margin-bottom:4px; }
+  .ll .chips .cc { font-size:12px; padding:2px 9px; }
+  .ll .txt { font-size:18px; } .ll.interim .txt { color:var(--mute); font-style:italic; }
+
+  .sync { max-height:440px; overflow:auto; border-radius:12px; background:var(--raise); margin-top:14px; display:none; }
+  .sl { display:flex; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line); border-left:3px solid transparent; cursor:pointer; }
+  .sl:last-child { border-bottom:0; } .sl:hover { background:var(--raise2); }
+  .sl.on { background:#1F2B4D; border-left-color:#fff; }
+  .sl .tm { color:var(--mute); width:40px; flex:none; font-variant-numeric:tabular-nums; padding-top:22px; font-size:13px; }
+  .words { display:flex; flex-wrap:wrap; gap:2px 10px; align-items:flex-start; }
   .w { display:flex; flex-direction:column; align-items:flex-start; }
-  .w .c { font-weight:800; font-size:14px; line-height:20px; height:20px; white-space:nowrap; }
-  .w .x { font-size:17px; line-height:24px; padding:0 2px; } .sl.on .w.hl .x { background:#2f4b78; border-radius:4px; }
-  select { font:inherit; color:var(--ink); background:#212837; border:1px solid var(--line); border-radius:9px; padding:8px 10px; }
-  .foot { color: var(--muted); font-size: 13px; margin-top: 18px; }
-  .err { color:#ff8e8e; }
+  .w .c { font:700 13px/22px var(--display); letter-spacing:-.02em; height:22px; white-space:nowrap; }
+  .w .c span { color:oklch(0.84 0.14 var(--h)); margin-right:6px; }
+  .w .x { font-size:18px; line-height:26px; padding:0 2px; }
+  .sl.on .w.hl .x { background:#34508A; border-radius:5px; }
+
+  details > summary { cursor:pointer; color:var(--mute); padding:4px 0; }
+  .foot { color:var(--faint); font-size:13px; margin-top:30px; max-width:70ch; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Chord Listener</h1>
-  <p class="sub">Give it a song. It listens, works out which chords are playing, and follows along as the song plays.</p>
+  <div class="mark">Chords by Claude</div>
 
-  <label class="drop" id="drop">
-    <b>Drop an audio file here, or tap to choose</b>
-    <span>MP3, M4A, WAV, OGG — analysis runs in your browser and nothing is uploaded (the optional lyrics mode is the exception, see below)</span>
+  <section class="stage" id="stage">
+    <svg id="ring" viewBox="0 0 300 300" role="img" aria-label="Circle of fifths. The lit segment is the chord playing now."></svg>
+    <div>
+      <p class="big idle" id="cur" aria-live="polite">Ready</p>
+      <div class="notes" id="notes"></div>
+      <div class="nextline" id="next">Upload a song, listen with the microphone, or try the demo.</div>
+      <div class="keychip" id="keywrap" style="display:none">Key: <b id="key"></b></div>
+    </div>
+  </section>
+
+  <div class="row" id="sources">
+    <label class="btn primary" for="file" id="uploadbtn" tabindex="0">Upload a song</label>
     <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac">
-  </label>
-  <div class="row" style="margin-top:10px">
-    <button id="mic">🎤 Listen with microphone</button>
-    <button id="demo">Try a demo (generated C – G – Am – F)</button>
+    <button class="btn" id="mic">Listen with microphone</button>
+    <button class="btn" id="demo">Try a demo</button>
   </div>
-  <div class="status" id="status"></div>
+  <div class="status" id="status">Drop an audio file anywhere on this page, too. Analysis happens on your device.</div>
   <div class="bar" id="bar"><i id="barfill"></i></div>
 
-  <div class="card" id="live" style="display:none;margin-top:16px">
-    <div class="row" style="justify-content:space-between;margin-bottom:8px">
-      <h2 style="margin:0"><span class="rec" id="rec"></span>Listening live</h2>
-      <div class="row">
-        <label class="t" style="font-size:14px;color:var(--muted)"><input type="checkbox" id="l7"> 7th chords</label>
-        <button id="stop">Stop</button>
-      </div>
+  <!-- live listening -->
+  <section class="block" id="live">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0"><span class="rec" id="rec"></span>Listening</h2>
+      <button class="btn primary small" id="stop">Stop and play back</button>
     </div>
-    <div class="now">
-      <div class="big" id="lcur">–</div>
-      <div class="meta"><div class="notes" id="lnotes"></div><div class="next" id="lhint">Play some music near the microphone…</div></div>
-    </div>
-    <div class="lvl"><i id="lvl"></i></div>
-    <h2 style="margin-top:16px">Heard so far</h2>
+    <div class="lvl" aria-hidden="true"><i id="lvl"></i></div>
+    <div class="hint" id="lhint" style="margin:0 0 14px">Play some music near the microphone. Everything is recorded (up to 10 minutes), so when you stop you can play it back with the chords.</div>
     <div class="heard" id="heard"></div>
-    <div class="row" style="justify-content:space-between;margin-top:18px">
-      <h2 style="margin:0">Lyrics with chords (experimental)</h2>
-      <label class="t" style="font-size:14px"><input type="checkbox" id="lyr"> Transcribe what's sung</label>
+    <div class="row" style="margin-top:22px">
+      <label class="t"><input type="checkbox" id="l7"> Include 7th chords</label>
+      <label class="t"><input type="checkbox" id="lyr"> Transcribe the singing</label>
+      <select id="lang" aria-label="Language to listen for">
+        <option value="en-US">English</option>
+        <option value="ne-NP">नेपाली (Nepali)</option>
+        <option value="hi-IN">हिन्दी (Hindi)</option>
+        <option value="">This device's language</option>
+      </select>
     </div>
-    <div class="next" id="lyrnote" style="margin-top:6px">Off. When on, your browser turns the sound into text. In Chrome and Safari that audio is sent to the browser maker's speech service, so the page's "nothing is uploaded" promise does not hold in this mode. Accuracy on music is often poor.</div>
-    <div class="lyrics" id="lyrics" style="display:none"></div>
-    <div class="row" style="margin-top:10px"><button id="lyrcopy">Copy chords + lyrics</button><span class="status" id="lyrcopied" style="margin:0"></span></div>
-  </div>
+    <div class="hint" id="lyrnote">Off. When on, your browser turns what it hears into text and sends the audio to its speech service (Google for Chrome, Apple for Safari). Accuracy on music is often poor.</div>
+    <div class="lyrics" id="lyrics"></div>
+    <div class="row" style="margin-top:12px"><button class="btn small" id="lyrcopy">Copy chords and lyrics</button><span class="status" id="lyrcopied" style="margin:0"></span></div>
+  </section>
 
-  <div id="app">
-    <div class="card" style="margin-top:16px">
+  <!-- a loaded song or finished recording -->
+  <div id="session">
+    <section class="block" id="app">
       <audio id="audio" controls preload="auto"></audio>
-      <div class="now">
-        <div class="big" id="cur">–</div>
-        <div class="meta">
-          <div class="notes" id="notes"></div>
-          <div class="next" id="next"></div>
-          <div class="next">Estimated key:<span class="chip" id="key">–</span></div>
-        </div>
-      </div>
       <div class="tl" id="tl"><div class="play" id="ph"></div></div>
-    </div>
-
-    <div class="card">
-      <h2>Tuning</h2>
-      <div class="ctrl">
+      <div class="ctrl" style="margin-top:22px">
         <div>
-          <label class="t"><input type="checkbox" id="use7"> Include 7th chords (Cmaj7, Am7, G7…)</label>
-          <small>Off = simple major/minor chords, the most reliable.</small>
+          <label class="t"><input type="checkbox" id="use7"> Include 7th chords (Cmaj7, Am7, G7)</label>
+          <small>Off keeps it to plain major and minor chords, which is the most reliable.</small>
         </div>
         <div>
           <label for="pen">Stability: <span id="penv"></span></label>
           <input type="range" id="pen" min="0.3" max="2.5" step="0.1" value="0.9">
-          <small>Higher = fewer, longer chords. Lower = reacts to quick changes.</small>
+          <small>Higher gives fewer, longer chords. Lower follows quick changes.</small>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card" id="tcard">
-      <h2>Lyrics synced to chords (experimental)</h2>
+    <section class="block" id="tcard">
+      <h2>Lyrics that follow the chords</h2>
       <div class="row">
-        <select id="tmodel" aria-label="Speech model">
-          <option value="Xenova/whisper-tiny.en">Tiny: English only, small download, fastest</option>
-          <option value="Xenova/whisper-base">Base: many languages, larger download, a bit better</option>
+        <select id="tlang" aria-label="Language of the singing">
+          <option value="">Detect the language</option>
+          <option value="english">English</option>
+          <option value="nepali">नेपाली (Nepali)</option>
+          <option value="hindi">हिन्दी (Hindi)</option>
         </select>
-        <button id="trans">Transcribe this file</button>
+        <select id="tmodel" aria-label="Speech model">
+          <option value="Xenova/whisper-base">Base: many languages, roughly 100 MB</option>
+          <option value="Xenova/whisper-small">Small: many languages, best for Nepali, roughly 250 MB</option>
+          <option value="Xenova/whisper-tiny.en">Tiny: English only, roughly 40 MB, fastest</option>
+        </select>
+        <button class="btn primary small" id="trans">Transcribe this recording</button>
       </div>
-      <div class="next" id="tstat" style="margin-top:8px">Your audio stays on your device. A speech model is downloaded once from the internet and then cached by your browser. A full song can take a few minutes. Works best when the voice is clear; singing over loud instruments is often garbled.</div>
+      <div class="hint" id="tstat">Your audio stays on your device. The speech model downloads once and your browser keeps it. A full song takes a few minutes. Nepali accuracy is modest, and singing over instruments is often garbled.</div>
       <div class="bar" id="tbar"><i id="tfill"></i></div>
       <div class="sync" id="sync"></div>
-      <div class="row" style="margin-top:10px"><button id="tcopy" style="display:none">Copy chord sheet with lyrics</button><span class="status" id="tcopied" style="margin:0"></span></div>
-    </div>
+      <div class="row" style="margin-top:12px"><button class="btn small" id="tcopy" style="display:none">Copy chord sheet with lyrics</button><span class="status" id="tcopied" style="margin:0"></span></div>
+      <details style="margin-top:16px"><summary>Paste your own lyrics instead</summary>
+        <textarea id="paste" placeholder="Paste lyrics you have the right to use, to read along while the chords play." style="margin-top:8px;height:110px"></textarea>
+      </details>
+    </section>
 
-    <div class="card">
-      <h2>Your lyrics (optional)</h2>
-      <textarea id="paste" placeholder="Paste lyrics you have the right to use here, to read along while the chords play." style="height:110px"></textarea>
-    </div>
-
-    <div class="card">
+    <section class="block">
       <h2>Chords by time</h2>
       <div id="list"></div>
-      <details style="margin-top:12px"><summary style="cursor:pointer;color:var(--muted)">Chord sheet as text</summary>
-        <textarea id="sheet" readonly></textarea>
-        <div class="row" style="margin-top:8px"><button id="copy">Copy</button><span class="status" id="copied" style="margin:0"></span></div>
+      <details style="margin-top:14px"><summary>Chord sheet as text</summary>
+        <textarea class="sheet" id="sheet" readonly style="margin-top:8px"></textarea>
+        <div class="row" style="margin-top:8px"><button class="btn small" id="copy">Copy</button><span class="status" id="copied" style="margin:0"></span></div>
       </details>
-    </div>
+    </section>
   </div>
 
-  <p class="foot">This listens with signal processing (a spectrum analysis plus chord matching), not a trained neural network. It does best on clear pop, rock and acoustic music with chords that last a bar or more, and gets less reliable with heavy distortion, dense mixes, or rapid jazz changes. Treat it as a strong starting point and check it by ear.</p>
+  <p class="foot">Chords are found with signal processing (a spectrum analysis plus chord matching), not a trained neural network. It does best on clear pop, rock and acoustic music with chords that last a bar or more, and gets less reliable with heavy distortion, dense mixes or fast jazz changes. Treat it as a strong starting point and check by ear. Colors follow the circle of fifths: chords that sit next to each other in a key have neighboring colors, major chords are filled and minor chords have a colored edge.</p>
 </main>
 
 <script>
@@ -420,19 +473,80 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
 <script>
 (function () {
   const $ = id => document.getElementById(id);
-  const core = window.ChordCore;
-  const audio = $('audio');
+  const core = window.ChordCore, audio = $('audio'), NOTES = core.NOTES;
   let an = null, segs = [], dur = 0, objUrl = null, lastIdx = -2;
   let fileBuf = null, tLines = [], tWorker = null, lastLine = -1, lastWord = -1;
+  let mic = null, usedSet = new Set(), keyPos = '';
+  const chordLog = [], lyricLines = [];
 
+  // ---------- helpers ----------
+  const pretty = s => s.replace('#', '♯');
   const fmt = t => { t = Math.round(t); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
-  const colour = s => s.root < 0 ? '#3a4152' : `hsl(${s.root * 30},${s.q.startsWith('m') && s.q !== 'maj7' ? 38 : 58}%,${s.q.startsWith('m') && s.q !== 'maj7' ? 36 : 44}%)`;
+  const isMinor = q => q === 'm' || q === 'm7';
+  const posOf = (root, minor) => minor ? (((root + 3) % 12) * 7) % 12 : (root * 7) % 12;   // position on the circle of fifths
+  const hueOf = c => (255 + posOf(c.root, isMinor(c.q)) * 30) % 360;
+  const keyOf = c => (isMinor(c.q) ? 'min' : 'maj') + posOf(c.root, isMinor(c.q));
+  function tint(el, c) { el.classList.add(isMinor(c.q) ? 'min' : 'maj'); el.style.setProperty('--h', hueOf(c)); }
+  function chip(c, time) {
+    const e = document.createElement('span'); e.className = 'cc'; tint(e, c);
+    e.textContent = pretty(c.label);
+    if (time != null) { const s = document.createElement('small'); s.textContent = fmt(time); e.appendChild(s); }
+    return e;
+  }
   const status = (m, err) => { $('status').textContent = m; $('status').className = 'status' + (err ? ' err' : ''); };
   const progress = p => { $('bar').style.display = p == null ? 'none' : 'block'; $('barfill').style.width = ((p || 0) * 100) + '%'; };
 
-  function decodeAudio(buf) {
-    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const ctx = new Ctx(1, 1, 22050);
+  // ---------- the ring (circle of fifths) ----------
+  const SVGNS = 'http://www.w3.org/2000/svg', ringEls = { maj: [], min: [] };
+  const polar = (r, a) => [150 + r * Math.cos(a), 150 + r * Math.sin(a)];
+  function wedge(r0, r1, a0, a1) {
+    const [x0, y0] = polar(r1, a0), [x1, y1] = polar(r1, a1), [x2, y2] = polar(r0, a1), [x3, y3] = polar(r0, a0);
+    return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3} Z`;
+  }
+  (function buildRing() {
+    const svg = $('ring');
+    for (let p = 0; p < 12; p++) {
+      const mid = (p * 30 - 90) * Math.PI / 180, a0 = mid - 13.4 * Math.PI / 180, a1 = mid + 13.4 * Math.PI / 180, root = (p * 7) % 12;
+      for (const [kind, r0, r1] of [['maj', 98, 144], ['min', 56, 93]]) {
+        const path = document.createElementNS(SVGNS, 'path'); path.setAttribute('d', wedge(r0, r1, a0, a1)); path.setAttribute('stroke-width', '2.5'); path.setAttribute('stroke-linejoin', 'round');
+        const t = document.createElementNS(SVGNS, 'text'), [tx, ty] = polar((r0 + r1) / 2, mid);
+        t.setAttribute('x', tx.toFixed(1)); t.setAttribute('y', ty.toFixed(1)); t.setAttribute('text-anchor', 'middle'); t.setAttribute('dominant-baseline', 'central');
+        t.textContent = kind === 'maj' ? pretty(NOTES[root]) : pretty(NOTES[(root + 9) % 12]) + 'm';
+        svg.append(path, t); ringEls[kind][p] = { path, t, hue: (255 + p * 30) % 360 };
+      }
+    }
+  })();
+  function ringPaint(cur) {
+    const curKey = cur && cur.root >= 0 ? keyOf(cur) : '';
+    for (const kind of ['maj', 'min']) for (let p = 0; p < 12; p++) {
+      const e = ringEls[kind][p], k = kind + p; let fill, txt, stroke = 'transparent';
+      if (k === curKey) { fill = `oklch(0.8 0.15 ${e.hue})`; txt = '#0A0E1A'; }
+      else if (usedSet.has(k)) { fill = `oklch(0.8 0.15 ${e.hue} / 0.34)`; txt = '#EDEFF8'; }
+      else { fill = '#121829'; txt = '#6B7694'; }
+      if (k === keyPos) stroke = '#F3F5FA';
+      e.path.style.fill = fill; e.path.style.stroke = stroke; e.t.style.fill = txt; e.t.style.fontWeight = k === curKey ? '700' : '600';
+    }
+  }
+  function showChord(c) {
+    const has = !!(c && c.root >= 0);
+    $('cur').textContent = has ? pretty(c.label) : (mic ? 'Listening' : (segs.length ? 'Rest' : 'Ready'));
+    $('cur').classList.toggle('on', has); $('cur').classList.toggle('idle', !has);
+    $('notes').innerHTML = has ? c.notes.map(n => `<span>${pretty(n)}</span>`).join('') : '';
+    if (has) { $('cur').style.setProperty('--h', hueOf(c)); $('stage').style.setProperty('--h', hueOf(c)); }
+    $('stage').classList.toggle('lit', has);
+    ringPaint(has ? c : null);
+  }
+  function setUsed(list) { usedSet = new Set(list.filter(c => c.root >= 0).map(keyOf)); }
+  function setKey(name) {
+    keyPos = '';
+    const m = /^([A-G]#?) (major|minor)$/.exec(name || '');
+    if (m) { const r = NOTES.indexOf(m[1]), mn = m[2] === 'minor'; keyPos = (mn ? 'min' : 'maj') + posOf(r, mn); }
+    $('keywrap').style.display = m ? 'block' : 'none'; $('key').textContent = m ? pretty(name) : '';
+  }
+
+  // ---------- audio helpers ----------
+  function decodeAudio(buf, rate) {
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext, ctx = new Ctx(1, 1, rate || 22050);
     return new Promise((res, rej) => { const p = ctx.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); });
   }
   function toMono(ab) {
@@ -450,23 +564,24 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     return new Blob([b], { type: 'audio/wav' });
   }
 
+  // ---------- analysing a song or a finished recording ----------
   async function analyse(samples, sr, url) {
     try {
-      tLines = [];
+      tLines = []; renderSync();
       if (objUrl) URL.revokeObjectURL(objUrl);
       objUrl = url; audio.src = url;
       const d = core.downsample(samples, sr, 22050);
       status('Listening…'); progress(0);
       an = await core.computeChroma(d.samples, d.sr, p => { progress(p); status('Listening… ' + Math.round(p * 100) + '%'); });
       dur = an.duration; progress(null);
-      status('Done. Press play on the player to follow along.');
-      $('app').style.display = 'block';
+      status('Done. Press play to follow along.');
+      $('session').style.display = 'block';
       render();
     } catch (e) { progress(null); status(e.message || 'Could not analyse that audio.', true); }
   }
-
   async function loadFile(file) {
     if (!file) return;
+    if (mic) await stopMic(true);
     status('Reading ' + file.name + '…'); progress(0.02);
     try {
       const buf = await file.arrayBuffer();
@@ -479,20 +594,24 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
   function render() {
     const pen = parseFloat($('pen').value); $('penv').textContent = pen.toFixed(1);
     const r = core.decodeChords(an, { use7: $('use7').checked, penalty: pen });
-    segs = r.segments; $('key').textContent = r.key || '–';
+    segs = r.segments; setKey(r.key); setUsed(segs);
     const tl = $('tl'); tl.querySelectorAll('.seg').forEach(e => e.remove());
-    segs.forEach((s, i) => {
+    segs.forEach(s => {
       const e = document.createElement('div'); e.className = 'seg';
-      e.style.left = (s.t0 / dur * 100) + '%'; e.style.width = ((s.t1 - s.t0) / dur * 100) + '%';
-      e.style.background = colour(s);
-      if ((s.t1 - s.t0) / dur > 0.025 && s.root >= 0) e.textContent = s.label;
-      e.title = s.label + ' · ' + fmt(s.t0);
+      if (s.root < 0) e.classList.add('rest'); else { tint(e, s); if ((s.t1 - s.t0) / dur > 0.028) e.textContent = pretty(s.label); }
+      e.style.left = (s.t0 / dur * 100) + '%'; e.style.width = 'calc(' + ((s.t1 - s.t0) / dur * 100) + '% - 2px)';
+      e.title = pretty(s.label) + ' at ' + fmt(s.t0);
       tl.insertBefore(e, $('ph'));
     });
     $('list').innerHTML = '';
-    segs.forEach((s, i) => {
-      const d = document.createElement('div'); d.className = 'li'; d.dataset.i = i;
-      d.innerHTML = `<span class="tm">${fmt(s.t0)}</span><span class="ch" style="color:${s.root < 0 ? '#8a92a6' : '#fff'}">${s.root < 0 ? '(rest)' : s.label}</span><span class="nt">${s.notes.join(' · ')}</span>`;
+    segs.forEach(s => {
+      const d = document.createElement('div'); d.className = 'li';
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = fmt(s.t0);
+      const nt = document.createElement('span'); nt.className = 'nt';
+      if (s.root >= 0) s.notes.forEach(n => { const i = document.createElement('span'); i.textContent = pretty(n); nt.appendChild(i); });
+      const cell = document.createElement('span');
+      if (s.root < 0) { cell.textContent = '(rest)'; cell.style.color = 'var(--faint)'; } else cell.appendChild(chip(s));
+      d.append(tm, cell, nt);
       d.onclick = () => { audio.currentTime = s.t0 + 0.01; };
       $('list').appendChild(d);
     });
@@ -504,17 +623,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
 
   function findIdx(t) { let lo = 0, hi = segs.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (segs[m].t0 <= t) lo = m; else hi = m - 1; } return lo; }
   function tick() {
-    if (segs.length) {
+    if (segs.length && !mic) {
       const t = audio.currentTime || 0, i = findIdx(t), s = segs[i];
       $('ph').style.left = (t / dur * 100) + '%';
       syncTick(t);
       if (i !== lastIdx) {
-        lastIdx = i;
-        $('cur').textContent = s.root < 0 ? '–' : s.label;
-        $('cur').style.color = s.root < 0 ? '#8a92a6' : colour(s).replace(/,\d+%\)$/, ',62%)');
-        $('notes').textContent = s.notes.join(' · ');
+        lastIdx = i; showChord(s);
         let nx = null; for (let j = i + 1; j < segs.length; j++) if (segs[j].root >= 0) { nx = segs[j]; break; }
-        $('next').innerHTML = nx ? 'Next: <b>' + nx.label + '</b> at ' + fmt(nx.t0) : '';
+        $('next').innerHTML = nx ? 'Next: <b>' + pretty(nx.label) + '</b> at ' + fmt(nx.t0) : '';
         const rows = $('list').children;
         for (const r of rows) r.classList.remove('on');
         const row = rows[i]; if (row) {
@@ -525,36 +641,36 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     }
     requestAnimationFrame(tick);
   }
-  let looping = false; const loop = () => { if (!looping) { looping = true; requestAnimationFrame(tick); } };
 
+  // ---------- controls ----------
   $('tl').addEventListener('click', e => { const r = $('tl').getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * dur; });
-  $('file').addEventListener('change', e => loadFile(e.target.files[0]));
-  const drop = $('drop');
-  ['dragenter', 'dragover'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+  $('file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+  $('uploadbtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
+  ['dragenter', 'dragover'].forEach(n => document.addEventListener(n, e => { e.preventDefault(); $('sources').classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(n => document.addEventListener(n, e => { e.preventDefault(); $('sources').classList.remove('over'); }));
+  document.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
   $('use7').addEventListener('change', () => an && render());
   $('pen').addEventListener('input', () => an && render());
-  $('demo').addEventListener('click', () => {
+  $('demo').addEventListener('click', async () => {
+    if (mic) await stopMic(true);
     const prog = ['C', 'G', 'Am', 'F', 'C', 'G', 'F', 'C'], sr = 22050;
     const x = core.synthProgression(prog, sr, 2, { noise: 0.02, melody: true });
-    fileBuf = null;
-    analyse(x, sr, URL.createObjectURL(wavBlob(x, sr)));
+    fileBuf = null; analyse(x, sr, URL.createObjectURL(wavBlob(x, sr)));
   });
   $('copy').addEventListener('click', async () => {
     const ta = $('sheet');
     try { await navigator.clipboard.writeText(ta.value); $('copied').textContent = 'Copied.'; }
-    catch (e) { ta.select(); $('copied').textContent = 'Text selected — press Ctrl/Cmd+C.'; }
+    catch (e) { ta.select(); $('copied').textContent = 'Text selected. Press Ctrl or Cmd+C.'; }
   });
 
-  // ---------- transcribe an uploaded file (Whisper in a background worker) + chord sync ----------
+  // ---------- transcribe a file or recording (Whisper in a background worker) + chord sync ----------
   const WORKER_SRC = `
     import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js';
     env.allowLocalModels = false;
     let asr = null, loaded = '';
     const files = {};
     self.onmessage = async (e) => {
-      const { model, audio } = e.data;
+      const { model, audio, lang } = e.data;
       try {
         if (!asr || loaded !== model) {
           asr = await pipeline('automatic-speech-recognition', model, { progress_callback: (p) => {
@@ -567,51 +683,48 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
           loaded = model;
         }
         self.postMessage({ type: 'transcribing' });
-        const out = await asr(audio, { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5 });
+        const opts = { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5 };
+        if (!model.endsWith('.en')) { opts.task = 'transcribe'; if (lang) opts.language = lang; }
+        const out = await asr(audio, opts);
         self.postMessage({ type: 'done', chunks: out.chunks || [], text: out.text || '' });
       } catch (err) { self.postMessage({ type: 'error', msg: String((err && err.message) || err) }); }
     };`;
-  const tstat = (m, err) => { $('tstat').textContent = m; $('tstat').className = 'next' + (err ? ' err' : ''); };
-  const tbar = p => { $('tbar').style.display = p == null ? 'none' : 'block'; $('tfill').style.width = ((p || 0)) + '%'; };
+  const tstat = (m, err) => { $('tstat').textContent = m; $('tstat').className = 'hint' + (err ? ' err' : ''); };
+  const tbar = p => { $('tbar').style.display = p == null ? 'none' : 'block'; $('tfill').style.width = (p || 0) + '%'; };
 
   async function audio16k(buf) {
-    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    const ab = await new Promise((res, rej) => { const p = new Ctx(1, 1, 16000).decodeAudioData(buf.slice(0), res, rej); if (p && p.then) p.then(res, rej); });
+    const ab = await decodeAudio(buf.slice(0), 16000);
     let x = toMono(ab);
-    if (Math.abs(ab.sampleRate - 16000) > 1) {            // browser kept its own rate: resample
+    if (Math.abs(ab.sampleRate - 16000) > 1) {
       const r = ab.sampleRate / 16000, y = new Float32Array(Math.floor(x.length / r));
       for (let i = 0; i < y.length; i++) { const f = i * r, j = Math.floor(f), a = x[j], b = x[j + 1] === undefined ? a : x[j + 1]; y[i] = a + (b - a) * (f - j); }
       x = y;
     }
     return x;
   }
-
   function cleanChunks(chunks) {
     const out = [];
     for (let i = 0; i < chunks.length; i++) {
       const text = (chunks[i].text || '').replace(/\s+/g, ' ').trim();
       if (!text) continue;
-      if (/^[\[(*♪\s].*[\])*♪\s]$/.test(text) && text.length < 40) continue;      // "(music)", "[Applause]", "♪"
+      if (/^[\[(*♪\s].*[\])*♪\s]$/.test(text) && text.length < 40) continue;
       const ts = chunks[i].timestamp || [0, null];
       let t0 = ts[0] == null ? 0 : ts[0], t1 = ts[1];
       if (t1 == null) { const nx = chunks.slice(i + 1).find(c => c.timestamp && c.timestamp[0] != null); t1 = nx ? nx.timestamp[0] : dur; }
       if (t1 <= t0) t1 = t0 + 2;
-      if (out.length && out[out.length - 1].text.toLowerCase() === text.toLowerCase()) continue;   // repeated hallucination
+      if (out.length && out[out.length - 1].text.toLowerCase() === text.toLowerCase()) continue;
       out.push({ t0, t1, text });
     }
     return out;
   }
-
-  // Which chord changes land on which word of a line (word timing is estimated from where it sits in the phrase)
   function placeChords(l) {
     const words = l.text.split(' '), total = l.text.length || 1, wt = [];
     let pos = 0;
     for (const w of words) { wt.push(l.t0 + (pos / total) * (l.t1 - l.t0)); pos += w.length + 1; }
-    const at = words.map(() => []);
-    let last = '';
+    const at = words.map(() => []); let last = '';
     for (const s of segs) {
       if (s.root < 0 || s.t1 <= l.t0 || s.t0 >= l.t1) continue;
-      if (s.t0 > l.t0 && s.t0 > l.t1 - 0.4) continue;      // starts as the line ends: belongs to the next line
+      if (s.t0 > l.t0 && s.t0 > l.t1 - 0.4) continue;
       const when = Math.max(s.t0, l.t0);
       let wi = 0; for (let i = 0; i < wt.length; i++) if (wt[i] <= when + 0.15) wi = i;
       if (s.label === last) continue; last = s.label;
@@ -619,13 +732,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     }
     return { words, wt, at };
   }
-
   function renderSync() {
-    const box = $('sync'); box.innerHTML = '';
-    lastLine = -1; lastWord = -1;
+    const box = $('sync'); box.innerHTML = ''; lastLine = -1; lastWord = -1;
     if (!tLines.length) { box.style.display = 'none'; $('tcopy').style.display = 'none'; return; }
-    box.style.display = 'block'; $('tcopy').style.display = 'inline-block';
-    tLines.forEach((l, i) => {
+    box.style.display = 'block'; $('tcopy').style.display = 'inline-flex';
+    tLines.forEach(l => {
       const { words, wt, at } = placeChords(l);
       l.wt = wt; l.wordEls = [];
       const row = document.createElement('div'); row.className = 'sl';
@@ -634,7 +745,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       words.forEach((w, k) => {
         const cell = document.createElement('span'); cell.className = 'w';
         const c = document.createElement('span'); c.className = 'c';
-        c.innerHTML = at[k].map(s => `<span style="color:${colour(s).replace(/,\d+%\)$/, ',66%)')}">${s.label}</span>`).join(' ');
+        at[k].forEach(s => { const n = document.createElement('span'); n.textContent = pretty(s.label); n.style.setProperty('--h', hueOf(s)); c.appendChild(n); });
         const x = document.createElement('span'); x.className = 'x'; x.textContent = w;
         cell.append(c, x); wd.appendChild(cell); l.wordEls.push(cell);
       });
@@ -643,11 +754,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       l.row = row; box.appendChild(row);
     });
   }
-
   function syncTick(t) {
     if (!tLines.length) return;
     let li = -1; for (let i = 0; i < tLines.length; i++) { if (tLines[i].t0 <= t + 0.05) li = i; else break; }
-    if (li >= 0 && t > tLines[li].t1 + 1.5) li = -1;                         // instrumental gap: nothing highlighted
+    if (li >= 0 && t > tLines[li].t1 + 1.5) li = -1;
     if (li !== lastLine) {
       if (lastLine >= 0 && tLines[lastLine]) tLines[lastLine].row.classList.remove('on');
       lastLine = li; lastWord = -1;
@@ -661,7 +771,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       if (wi !== lastWord) { if (lastWord >= 0 && l.wordEls[lastWord]) l.wordEls[lastWord].classList.remove('hl'); l.wordEls[wi].classList.add('hl'); lastWord = wi; }
     }
   }
-
   function sheetText() {
     return tLines.map(l => {
       let c = '', w = '';
@@ -672,15 +781,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       return fmt(l.t0) + '\n' + c.trimEnd() + '\n' + w.trimEnd();
     }).join('\n\n');
   }
-
   function finishTranscribe(msg, err) {
     if (tWorker) { tWorker.terminate(); tWorker = null; }
     $('trans').disabled = false; tbar(null); tstat(msg, err);
   }
-
+  $('tlang').addEventListener('change', () => {
+    const l = $('tlang').value;
+    if (l && l !== 'english' && $('tmodel').value.endsWith('.en')) $('tmodel').value = l === 'nepali' ? 'Xenova/whisper-small' : 'Xenova/whisper-base';
+    if (l === 'nepali') tstat('For Nepali, the Small model is noticeably better than Base, but the download is larger. Clear speech works much better than singing.');
+  });
   $('trans').addEventListener('click', async () => {
     if (tWorker) return;
-    if (!fileBuf) { tstat('Transcription needs an uploaded audio file. The demo has no singing in it.', true); return; }
+    if (!fileBuf) { tstat('Transcription needs an uploaded song or a recording you made. The demo has no singing in it.', true); return; }
+    const model = $('tmodel').value, lang = $('tlang').value;
+    if (model.endsWith('.en') && lang && lang !== 'english') { tstat('The Tiny model only does English. Pick Base or Small for this language.', true); return; }
     $('trans').disabled = true; tstat('Preparing the audio…'); tbar(0);
     let audioData;
     try { audioData = await audio16k(fileBuf); } catch (e) { finishTranscribe('Could not read that audio for transcription.', true); return; }
@@ -700,80 +814,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
       else if (m.type === 'done') {
         clearInterval(timer);
         tLines = cleanChunks(m.chunks); renderSync();
-        finishTranscribe(tLines.length ? 'Done: ' + tLines.length + ' lines. Click a line to jump there. Chord names sit above the words where the chord changes.' : 'No words were recognised. Songs with loud instruments often defeat speech recognition; a clearer vocal track works much better.');
+        finishTranscribe(tLines.length ? 'Done: ' + tLines.length + ' lines. Click a line to jump there. Chord names sit above the words where the chord changes.' : 'No words were recognised. Songs with loud instruments often defeat speech recognition; a clearer vocal works much better.');
       }
       else if (m.type === 'error') { clearInterval(timer); finishTranscribe('Transcription failed: ' + m.msg, true); }
     };
-    tWorker.postMessage({ model: $('tmodel').value, audio: audioData }, [audioData.buffer]);
+    tWorker.postMessage({ model, audio: audioData, lang }, [audioData.buffer]);
   });
   $('tcopy').addEventListener('click', async () => {
     const txt = sheetText();
     try { await navigator.clipboard.writeText(txt); $('tcopied').textContent = 'Copied.'; }
-    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.style.cssText = 'width:100%;height:160px;margin-top:8px;font:13px ui-monospace,monospace'; $('tcopied').after(ta); ta.select(); $('tcopied').textContent = 'Select the text below and copy it.'; }
+    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.className = 'sheet'; ta.style.cssText = 'height:160px;margin-top:8px'; $('tcopied').after(ta); ta.select(); $('tcopied').textContent = 'Select the text below and copy it.'; }
   });
 
-  // ---------- live microphone mode ----------
-  let mic = null;
-  const MIC_BLOCKED = 'The microphone isn\'t available here. Some viewers (including the hosted preview) block it. Open the downloaded chord-listener.html file in Chrome on your computer and allow the microphone when asked.';
-  async function startMic() {
-    if (mic) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status(MIC_BLOCKED, true); return; }
-    let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
-    catch (e) { status(e && e.name === 'NotFoundError' ? 'No microphone found on this device.' : MIC_BLOCKED, true); return; }
-    audio.pause();
-    const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
-    try { await ctx.resume(); } catch (e) {}
-    const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain();
-    mute.gain.value = 0;
-    const ring = new Float32Array(Math.round(ctx.sampleRate * 2)); let wp = 0, filled = 0;
-    proc.onaudioprocess = e => {
-      const d = e.inputBuffer.getChannelData(0);
-      for (let i = 0; i < d.length; i++) { ring[wp] = d[i]; wp = (wp + 1) % ring.length; }
-      filled = Math.min(ring.length, filled + d.length);
-    };
-    src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
-    mic = { stream, ctx, proc, src, mute, timer: null, busy: false, cand: '', count: 0, shown: '' };
-    $('live').style.display = 'block'; $('rec').style.display = 'inline-block';
-    chordLog.length = 0; resetLyrics();
-    $('heard').innerHTML = ''; $('lcur').textContent = '–'; $('lcur').style.color = ''; $('lnotes').textContent = '';
-    $('lhint').textContent = 'Play some music near the microphone…';
-    status('Listening through your microphone.');
-    mic.timer = setInterval(async () => {
-      if (!mic || mic.busy || filled < ring.length * 0.6) return;
-      mic.busy = true;
-      try {
-        const x = filled < ring.length ? ring.slice(0, wp) : (() => { const o = new Float32Array(ring.length); o.set(ring.subarray(wp), 0); o.set(ring.subarray(0, wp), ring.length - wp); return o; })();
-        const r = await core.liveEstimate(x, ctx.sampleRate, { use7: $('l7').checked });
-        if (!mic) return;
-        $('lvl').style.width = Math.min(100, r.rms * 600) + '%';
-        if (r.label === mic.cand) mic.count++; else { mic.cand = r.label; mic.count = 1; }
-        if (mic.count >= 2 && r.label !== mic.shown) {
-          mic.shown = r.label;
-          chordLog.push({ t: performance.now(), label: r.root < 0 ? null : r.label, root: r.root, q: r.q });
-          if (r.root < 0) { $('lcur').textContent = '–'; $('lcur').style.color = ''; $('lnotes').textContent = ''; }
-          else {
-            $('lcur').textContent = r.label; $('lcur').style.color = colour(r).replace(/,\d+%\)$/, ',62%)'); $('lnotes').textContent = r.notes.join(' · ');
-            const h = document.createElement('span'); h.className = 'hc'; h.style.background = colour(r); h.textContent = r.label;
-            $('heard').appendChild(h); while ($('heard').children.length > 80) $('heard').firstChild.remove();
-            $('heard').scrollTop = 1e6;
-          }
-        }
-        $('lhint').textContent = r.rms < 0.004 ? 'Too quiet — move closer to the sound or turn it up.' : (mic.shown && mic.shown !== 'N' ? '' : 'Listening…');
-      } catch (e) {} finally { if (mic) mic.busy = false; }
-    }, 300);
-  }
-  function stopMic() {
-    if (!mic) return;
-    stopLyrics(); $('lyr').checked = false;
-    clearInterval(mic.timer);
-    try { mic.proc.disconnect(); mic.src.disconnect(); mic.mute.disconnect(); } catch (e) {}
-    mic.stream.getTracks().forEach(t => t.stop());
-    try { mic.ctx.close(); } catch (e) {}
-    mic = null; $('rec').style.display = 'none'; $('lvl').style.width = '0'; $('lhint').textContent = 'Stopped.'; status('');
-  }
-  // ---------- lyrics (speech-to-text) next to chords ----------
-  const chordLog = [], lyricLines = [];
+  // ---------- live lyrics (browser speech-to-text), tagged with chords ----------
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null, recWant = false, curLine = null;
   function chordsFor(line) {
@@ -784,21 +837,21 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
     return out;
   }
   function drawLine(line, interim) {
-    line.chipsEl.innerHTML = chordsFor(line).map(c => `<span class="hc" style="background:${colour(c)}">${c.label}</span>`).join('');
-    line.txtEl.textContent = line.text; line.el.classList.toggle('interim', interim);
+    line.chipsEl.innerHTML = ''; chordsFor(line).forEach(c => line.chipsEl.appendChild(chip(c)));
+    line.txtEl.textContent = line.text; line.t1 = performance.now(); line.el.classList.toggle('interim', interim);
     const L = $('lyrics'); L.scrollTop = L.scrollHeight;
   }
   function newLine() {
     const el = document.createElement('div'); el.className = 'll';
     el.innerHTML = '<div class="chips"></div><div class="txt"></div>';
     $('lyrics').appendChild(el); $('lyrics').style.display = 'block';
-    const line = { t0: performance.now(), text: '', el, chipsEl: el.firstChild, txtEl: el.lastChild };
+    const line = { t0: performance.now(), t1: performance.now(), text: '', el, chipsEl: el.firstChild, txtEl: el.lastChild };
     lyricLines.push(line); return line;
   }
   function resetLyrics() { lyricLines.length = 0; curLine = null; $('lyrics').innerHTML = ''; $('lyrics').style.display = 'none'; }
   function startLyrics() {
-    if (!SR) { $('lyrnote').textContent = 'This browser can\'t do speech-to-text. Chrome (computer or Android) or Safari on iPhone usually can.'; $('lyr').checked = false; return; }
-    rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || 'en-US';
+    if (!SR) { $('lyrnote').textContent = 'This browser can\'t do speech-to-text. Chrome on a computer or Android usually can.'; $('lyr').checked = false; return; }
+    rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = $('lang').value || navigator.language || 'en-US';
     rec.onresult = e => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i], txt = (r[0].transcript || '').trim(); if (!txt) continue;
@@ -807,24 +860,103 @@ if (typeof module !== 'undefined' && module.exports) module.exports = api; else 
         if (r.isFinal) curLine = null;
       }
     };
-    rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Speech-to-text was blocked. Allow it when the browser asks, or use the paste box instead.'; } };
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Speech-to-text was blocked. Allow it when the browser asks, or use the paste box after you stop.'; }
+      else if (e.error === 'language-not-supported') { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'This browser has no live speech-to-text for that language. Chrome on a computer or Android supports Nepali; after you stop, the "Transcribe this recording" button can also try Nepali.'; }
+    };
     rec.onend = () => { if (recWant) { try { rec.start(); } catch (e) {} } };
     recWant = true;
-    try { rec.start(); $('lyrnote').textContent = 'Transcribing… sung words appear below with the chords heard at that moment. Expect mistakes on music.'; }
+    try { rec.start(); $('lyrnote').textContent = 'Transcribing… words appear below with the chords heard at that moment. Expect mistakes on music.'; }
     catch (e) { recWant = false; $('lyr').checked = false; $('lyrnote').textContent = 'Could not start speech-to-text.'; }
   }
   function stopLyrics() { recWant = false; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } }
   $('lyr').addEventListener('change', () => { if (!mic) { $('lyr').checked = false; return; } $('lyr').checked ? startLyrics() : (stopLyrics(), $('lyrnote').textContent = 'Off.'); });
+  $('lang').addEventListener('change', () => { if (rec && recWant) { stopLyrics(); startLyrics(); } });
   $('lyrcopy').addEventListener('click', async () => {
     const txt = lyricLines.filter(l => l.text).map(l => chordsFor(l).map(c => c.label).join(' ') + '\n' + l.text).join('\n\n');
     if (!txt) { $('lyrcopied').textContent = 'Nothing to copy yet.'; return; }
     try { await navigator.clipboard.writeText(txt); $('lyrcopied').textContent = 'Copied.'; }
-    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.style.cssText = 'width:100%;height:120px;margin-top:8px'; $('lyrcopied').after(ta); ta.select(); $('lyrcopied').textContent = 'Select the text below and copy it.'; }
+    catch (e) { const ta = document.createElement('textarea'); ta.value = txt; ta.className = 'sheet'; ta.style.cssText = 'height:120px;margin-top:8px'; $('lyrcopied').after(ta); ta.select(); $('lyrcopied').textContent = 'Select the text below and copy it.'; }
   });
 
+  // ---------- live microphone: listen, record, then play back ----------
+  const MAX_SECONDS = 600;
+  const MIC_BLOCKED = 'The microphone isn\'t available here. Some viewers (including the Claude preview) block it. Open the GitHub site in Chrome or Safari and allow the microphone when asked.';
+  async function startMic() {
+    if (mic) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status(MIC_BLOCKED, true); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { status(e && e.name === 'NotFoundError' ? 'No microphone found on this device.' : MIC_BLOCKED, true); return; }
+    audio.pause(); segs = []; an = null; tLines = []; renderSync(); setUsed([]); setKey(''); $('session').style.display = 'none';
+    const AC = window.AudioContext || window.webkitAudioContext, ctx = new AC();
+    try { await ctx.resume(); } catch (e) {}
+    const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), mute = ctx.createGain();
+    mute.gain.value = 0;
+    const ring = new Float32Array(Math.round(ctx.sampleRate * 2)); let wp = 0, filled = 0;
+    mic = { stream, ctx, proc, src, mute, timer: null, busy: false, cand: '', count: 0, shown: '', chunks: [], len: 0, t0: performance.now(), heardList: [] };
+    proc.onaudioprocess = e => {
+      const d = e.inputBuffer.getChannelData(0);
+      for (let i = 0; i < d.length; i++) { ring[wp] = d[i]; wp = (wp + 1) % ring.length; }
+      filled = Math.min(ring.length, filled + d.length);
+      if (mic) { mic.chunks.push(new Float32Array(d)); mic.len += d.length; if (mic.len > ctx.sampleRate * MAX_SECONDS) setTimeout(() => stopMic(), 0); }
+    };
+    src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+    $('live').style.display = 'block'; $('rec').style.display = 'inline-block';
+    chordLog.length = 0; resetLyrics();
+    $('heard').innerHTML = ''; showChord(null); $('next').textContent = 'Listening…';
+    $('lhint').textContent = 'Play some music near the microphone. Everything is recorded (up to 10 minutes), so when you stop you can play it back with the chords.';
+    $('mic').disabled = true; status('Listening through your microphone.');
+    mic.timer = setInterval(async () => {
+      const m = mic;
+      if (!m || m.busy || filled < ring.length * 0.6) return;
+      m.busy = true;
+      try {
+        const x = filled < ring.length ? ring.slice(0, wp) : (() => { const o = new Float32Array(ring.length); o.set(ring.subarray(wp), 0); o.set(ring.subarray(0, wp), ring.length - wp); return o; })();
+        const r = await core.liveEstimate(x, ctx.sampleRate, { use7: $('l7').checked });
+        if (mic !== m) return;
+        $('lvl').style.width = Math.min(100, r.rms * 600) + '%';
+        if (r.label === m.cand) m.count++; else { m.cand = r.label; m.count = 1; }
+        if (m.count >= 2 && r.label !== m.shown) {
+          m.shown = r.label;
+          chordLog.push({ t: performance.now(), label: r.root < 0 ? null : r.label, root: r.root, q: r.q });
+          showChord(r);
+          if (r.root >= 0) {
+            m.heardList.push(r); setUsed(m.heardList); ringPaint(r);
+            const h = chip(r, (performance.now() - m.t0) / 1000);
+            $('heard').appendChild(h); while ($('heard').children.length > 120) $('heard').firstChild.remove();
+            $('heard').scrollTop = 1e6;
+          }
+        }
+        $('next').textContent = r.rms < 0.004 ? 'Too quiet. Move closer to the sound or turn it up.' : (m.shown && m.shown !== 'N' ? '' : 'Listening…');
+      } catch (e) {} finally { m.busy = false; }
+    }, 300);
+  }
+  async function stopMic(silent) {
+    if (!mic) return;
+    const m = mic; mic = null;
+    stopLyrics(); $('lyr').checked = false; clearInterval(m.timer);
+    const sr = m.ctx.sampleRate;
+    try { m.proc.disconnect(); m.src.disconnect(); m.mute.disconnect(); } catch (e) {}
+    m.stream.getTracks().forEach(t => t.stop());
+    try { m.ctx.close(); } catch (e) {}
+    $('live').style.display = 'none'; $('rec').style.display = 'none'; $('lvl').style.width = '0'; $('mic').disabled = false;
+    if (m.len < sr * 3) { status('That was too short to save. Record at least 3 seconds.', true); showChord(null); $('next').textContent = ''; return; }
+    const x = new Float32Array(m.len); let o = 0; for (const c of m.chunks) { x.set(c, o); o += c.length; }
+    const lines = lyricLines.filter(l => l.text).map(l => ({ text: l.text, t0: Math.max(0, (l.t0 - m.t0) / 1000), t1: Math.max((l.t1 - m.t0) / 1000, (l.t0 - m.t0) / 1000 + 1.5) }));
+    const blob = wavBlob(x, sr);
+    fileBuf = await blob.arrayBuffer();
+    if (silent) { status(''); }
+    await analyse(x, sr, URL.createObjectURL(blob));
+    if (lines.length) { tLines = lines; renderSync(); }
+    status('Saved your recording. Press play to hear it back with the chords.');
+    $('session').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
   $('mic').addEventListener('click', startMic);
-  $('stop').addEventListener('click', stopMic);
-  loop();
+  $('stop').addEventListener('click', () => stopMic());
+
+  ringPaint(null);
+  requestAnimationFrame(tick);
 })();
 </script>
 </body>
